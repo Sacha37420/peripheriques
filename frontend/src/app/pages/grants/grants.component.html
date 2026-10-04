@@ -1,0 +1,144 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Droits d'accès</h1>
+      <p class="subtitle">
+        Les droits s'accordent par email, à un compte du lab existant, périphérique par périphérique
+        (vidéo, micro ou les deux). Un droit ne donne accès qu'aux enregistrements postérieurs à son
+        octroi. Gérer les droits ne donne aucun accès : pour voir ou écouter, un administrateur
+        s'accorde lui-même un droit.
+      </p>
+    </div>
+    <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">Actualiser</button>
+  </header>
+
+  <form class="card add" data-test="grant-form" (submit)="submit($event)">
+    <h2>Accorder un droit</h2>
+    <div class="add-fields">
+      <div class="form-group">
+        <label for="grant-email">Email du compte</label>
+        <input id="grant-email" type="email" name="email" required autocomplete="off"
+               data-test="grant-email"
+               [value]="email()" (input)="email.set($any($event.target).value)" />
+      </div>
+      <div class="form-group">
+        <label for="grant-device">Périphérique</label>
+        <select id="grant-device" name="device" data-test="grant-device"
+                (change)="device.set($any($event.target).value)">
+          @for (d of devices(); track d.slug) {
+            <option [value]="d.slug" [selected]="d.slug === device()">{{ d.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    <div class="add-actions">
+      <label class="check">
+        <input type="checkbox" name="video" data-test="grant-video"
+               [checked]="video()" (change)="video.set($any($event.target).checked)" />
+        Vidéo
+      </label>
+      <label class="check">
+        <input type="checkbox" name="audio" data-test="grant-audio"
+               [checked]="audio()" (change)="audio.set($any($event.target).checked)" />
+        Micro
+      </label>
+      <button type="submit" class="btn btn-primary" data-test="grant-submit" [disabled]="submitting()">
+        Accorder
+      </button>
+    </div>
+    <p class="grant-note" data-test="grant-note">
+      Un droit — y compris à votre propre email — ne donne accès qu’aux enregistrements
+      postérieurs à son octroi.
+    </p>
+    @if (formErrors().length) {
+      <div class="msgs" role="alert" data-test="form-errors">
+        @for (msg of formErrors(); track $index) { <p class="error-msg">{{ msg }}</p> }
+      </div>
+    }
+    @if (formSuccess()) {
+      <p class="success-msg" role="status">{{ formSuccess() }}</p>
+    }
+  </form>
+
+  @if (loading()) {
+    <p class="loading-msg">Chargement des droits…</p>
+  } @else if (loadErrors().length) {
+    <div class="card" role="alert">
+      @for (msg of loadErrors(); track $index) { <p class="error-msg">{{ msg }}</p> }
+    </div>
+  } @else if (!grants().length) {
+    <div class="card"><p class="empty-msg">Aucun droit accordé pour l'instant.</p></div>
+  } @else {
+    <div class="card list">
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Périphérique</th>
+            <th>Vidéo</th>
+            <th>Micro</th>
+            <th>Depuis</th>
+            <th>Accordé par</th>
+            <th>Mis à jour</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (g of grants(); track g.id) {
+            <tr data-test="grant-row" [attr.data-id]="g.id" [class.busy]="isBusy(g.id)"
+                [attr.aria-busy]="isBusy(g.id)">
+              <td class="email">{{ g.email }}</td>
+              <td>{{ deviceLabel(g.device) }}</td>
+              <td>
+                <label class="check" [attr.aria-label]="'Vidéo — ' + g.email">
+                  <input type="checkbox" data-test="row-video" [checked]="g.video"
+                         [disabled]="isBusy(g.id)" (change)="toggle(g, 'video', $event)" />
+                </label>
+              </td>
+              <td>
+                <label class="check" [attr.aria-label]="'Micro — ' + g.email">
+                  <input type="checkbox" data-test="row-audio" [checked]="g.audio"
+                         [disabled]="isBusy(g.id)" (change)="toggle(g, 'audio', $event)" />
+                </label>
+              </td>
+              <td class="since">
+                <span>Vidéo : {{ since(g.video_since) }}</span>
+                <span>Micro : {{ since(g.audio_since) }}</span>
+              </td>
+              <td>{{ g.granted_by }}</td>
+              <td class="nowrap">{{ fmt(g.updated_at) }}</td>
+              <td class="actions">
+                @if (confirming() !== g.id) {
+                  <button type="button" class="btn btn-danger" data-test="revoke"
+                          [disabled]="isBusy(g.id)" (click)="askRevoke(g)">Révoquer</button>
+                }
+              </td>
+            </tr>
+            @if (confirming() === g.id) {
+              <tr class="sub confirm">
+                <td colspan="8">
+                  <div class="confirm-box">
+                    <span>Révoquer l'accès de {{ g.email }} à {{ deviceLabel(g.device) }} ?</span>
+                    <button type="button" class="btn btn-danger" data-test="revoke-confirm"
+                            [disabled]="isBusy(g.id)" (click)="revoke(g)">Confirmer</button>
+                    <button type="button" class="btn btn-ghost" data-test="revoke-cancel"
+                            [disabled]="isBusy(g.id)" (click)="cancelRevoke()">Annuler</button>
+                  </div>
+                </td>
+              </tr>
+            }
+            @if (rowErrors()[g.id]; as msgs) {
+              <tr class="sub">
+                <td colspan="8">
+                  <div class="msgs" role="alert" data-test="row-errors" [attr.data-id]="g.id">
+                    @for (msg of msgs; track $index) { <p class="error-msg">{{ msg }}</p> }
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

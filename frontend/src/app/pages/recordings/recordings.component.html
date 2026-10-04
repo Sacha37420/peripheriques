@@ -1,0 +1,116 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Enregistrements</h1>
+      <p class="subtitle">Relecture des enregistrements des périphériques auxquels vous avez accès (heure de Paris).</p>
+    </div>
+  </header>
+
+  @if (loadingDevices()) {
+    <p class="loading-msg">Chargement des périphériques…</p>
+  } @else if (deviceErrors().length) {
+    <div class="card" role="alert">
+      @for (msg of deviceErrors(); track $index) { <p class="error-msg">{{ msg }}</p> }
+    </div>
+  } @else if (!devices().length) {
+    <app-no-access />
+  } @else {
+    <div class="card controls">
+      <div class="form-group">
+        <label for="rec-device">Périphérique</label>
+        <select id="rec-device" data-test="device-select" (change)="onDevice($any($event.target).value)">
+          @for (d of devices(); track d.slug) {
+            <option [value]="d.slug" [selected]="d.slug === slug()">{{ d.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="rec-date">Journée</label>
+        <input id="rec-date" type="date" data-test="date-input"
+               [value]="date()" [min]="minDate()" [max]="maxDate()"
+               (change)="onDate($any($event.target).value)" />
+      </div>
+      <div class="day-nav">
+        <button type="button" class="btn btn-ghost" (click)="shiftDay(-1)" [disabled]="date() <= minDate()">Jour précédent</button>
+        <button type="button" class="btn btn-ghost" (click)="shiftDay(1)" [disabled]="date() >= maxDate()">Jour suivant</button>
+      </div>
+    </div>
+
+    <h2 class="day-title">{{ longDate() }}</h2>
+
+    @if (playback(); as p) {
+      <div class="card player" data-test="player">
+        <div class="player-head">
+          <h3>Lecture : {{ fmtDateTime(p.start) }}</h3>
+          <button type="button" class="btn btn-secondary" (click)="stop()">Fermer</button>
+        </div>
+        @if (p.errors.length) {
+          <div role="alert">
+            @for (msg of p.errors; track $index) { <p class="error-msg">{{ msg }}</p> }
+          </div>
+        } @else if (p.ticket) {
+          @if (hasVideo(p.ticket)) {
+            <video #media controls autoplay playsinline [src]="p.url"></video>
+          } @else {
+            <audio #media controls autoplay [src]="p.url"></audio>
+          }
+        } @else {
+          <p class="loading-msg">Préparation de la lecture…</p>
+        }
+      </div>
+    }
+
+    @if (sinceLines().length) {
+      <div class="card since" data-test="since-banner">
+        @for (line of sinceLines(); track $index) { <p>{{ line }}</p> }
+      </div>
+    }
+
+    <div class="card">
+      <div class="timeline" data-test="timeline" role="group" aria-label="Frise des enregistrements de la journée">
+        @for (b of blocks(); track b.seg.start) {
+          <button type="button" [class]="'block block-' + b.cls" data-test="segment-block"
+                  [style.left.%]="b.left" [style.width.%]="b.width"
+                  [attr.aria-label]="b.label" [title]="b.label"
+                  (click)="playFromBlock(b, $event)"></button>
+        }
+      </div>
+      <div class="ticks" aria-hidden="true">
+        @for (t of ticks(); track t.label) {
+          <span [style.left.%]="t.pos">{{ t.label }}</span>
+        }
+      </div>
+      <ul class="legend">
+        <li><span class="swatch block-av"></span>Vidéo + micro</li>
+        <li><span class="swatch block-video"></span>Vidéo seule</li>
+        <li><span class="swatch block-audio"></span>Micro seul</li>
+      </ul>
+    </div>
+
+    @if (loadingSegs()) {
+      <p class="loading-msg">Chargement des enregistrements…</p>
+    } @else if (segErrors().length) {
+      <div class="card" role="alert">
+        @for (msg of segErrors(); track $index) { <p class="error-msg">{{ msg }}</p> }
+      </div>
+    } @else if (!segments().length) {
+      <p class="empty-msg">Aucun enregistrement pour cette journée.</p>
+    } @else {
+      <ul class="segments">
+        @for (s of segments(); track s.start) {
+          <li class="card segment" data-test="segment-row">
+            <span class="seg-time">{{ fmtTime(s.start) }} – {{ fmtTime(s.end) }}</span>
+            <span class="seg-dur">{{ fmtDuration(s.duration_s) }}</span>
+            <span class="seg-tracks">
+              @if (s.tracks.includes('video')) { <span class="badge badge-blue">Vidéo</span> }
+              @if (s.tracks.includes('audio')) { <span class="badge badge-green">Micro</span> }
+            </span>
+            <button type="button" class="btn btn-primary" data-test="play"
+                    [attr.aria-label]="'Lire depuis ' + fmtTime(s.start)"
+                    (click)="playSegment(s)">Lire</button>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>

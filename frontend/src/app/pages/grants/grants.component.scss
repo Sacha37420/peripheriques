@@ -1,0 +1,87 @@
+.add {
+  margin-bottom: var(--space-5);
+
+  h2 { font-size: var(--text-lg); margin-bottom: var(--space-3); }
+}
+
+.add-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 0 var(--space-4);
+}
+
+.add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+/* Label cliquable ≥ 44×44 autour de chaque case à cocher. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 44px;
+  min-height: 44px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+
+  input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  input:disabled { cursor: not-allowed; }
+}
+
+.msgs {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--danger-tint);
+  border-radius: var(--radius-sm);
+}
+
+.success-msg {
+  margin-top: var(--space-3);
+  color: var(--success);
+  font-size: var(--text-sm);
+}
+
+.list { padding: 0; overflow: hidden; }
+
+td { vertical-align: middle; }
+td.email { word-break: break-all; min-width: 160px; }
+td.nowrap { white-space: nowrap; }
+
+td.since {
+  font-size: var(--text-xs);
+  color: var(--text-mute);
+  white-space: nowrap;
+
+  span { display: block; }
+}
+
+tr.busy td { opacity: .6; }
+
+tr.sub td { background: var(--bg); }
+tr.sub .msgs { margin-top: 0; }
+
+.confirm-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+
+  span { margin-right: auto; }
+}
+
+.grant-note { color: var(--text-mute); font-size: var(--text-sm); margin-top: var(--space-3); }

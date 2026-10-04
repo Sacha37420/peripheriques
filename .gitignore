@@ -1,0 +1,24 @@
+# ── Secrets / config locale ──────────────────────────────────────────────────
+.env
+.keycloak-client-opts
+
+# ── Python / Django (racine si app Django seul, backend/ si Django+Angular) ───
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+db.sqlite3
+/backend/media/  # (pas « media/ » : peripheriques/media/ est le service MediaMTX, il doit être versionné)
+
+# ── Angular / Node (racine si app Angular seul, frontend/ si +Angular) ────────
+node_modules/
+dist/
+.angular/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# ── Divers ───────────────────────────────────────────────────────────────────
+*.log
+.DS_Store

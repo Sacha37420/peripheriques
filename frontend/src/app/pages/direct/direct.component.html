@@ -1,0 +1,46 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Direct</h1>
+      <p class="subtitle">Vidéo et son en temps réel des périphériques auxquels vous avez accès.</p>
+    </div>
+    <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">Actualiser</button>
+  </header>
+
+  @if (loading()) {
+    <p class="loading-msg">Chargement des périphériques…</p>
+  } @else if (errors().length) {
+    <div class="card" role="alert">
+      @for (msg of errors(); track $index) { <p class="error-msg">{{ msg }}</p> }
+    </div>
+  } @else if (!items().length) {
+    <app-no-access />
+  } @else {
+    <div class="grid">
+      @for (item of items(); track item.device.slug) {
+        <article class="card device" [attr.data-device]="item.device.slug">
+          <header class="device-head">
+            <h2>{{ item.device.label }}</h2>
+            @if (item.device.online) {
+              <span class="badge badge-green">En ligne</span>
+            } @else {
+              <span class="badge badge-gray">Hors ligne</span>
+            }
+            @if (item.kind) { <span class="badge badge-blue">{{ kindLabel[item.kind] }}</span> }
+          </header>
+
+          @if (!item.kind) {
+            <p class="empty-msg">Aucun droit de visionnage ou d’écoute sur ce périphérique.</p>
+          } @else if (!item.device.online) {
+            <p class="offline">
+              Le périphérique est hors ligne : pas de direct pour le moment.
+              Les <a routerLink="/enregistrements">enregistrements</a> déjà réalisés restent consultables.
+            </p>
+          } @else {
+            <app-live-player [slug]="item.device.slug" [kind]="item.kind" />
+          }
+        </article>
+      }
+    </div>
+  }
+</section>

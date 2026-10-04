@@ -1,0 +1,72 @@
+# MediaMTX — service media du chantier « peripheriques » (contrat v1 : I1, I2, I4, I6).
+# Version épinglée : 1.21.1 (voir Dockerfile). Toute clé absente prend la valeur par défaut de
+# MediaMTX. Les valeurs dépendant de .env (hook, ports/hôtes ICE) sont injectées par
+# entrypoint.sh via des surcharges MTX_* — elles ne sont PAS écrites ici.
+
+logLevel: info
+logDestinations: [stdout]
+
+readTimeout: 10s
+writeTimeout: 10s
+
+###############################################################################
+# Authentification — TOUT passe par le hook I2 du backend (aucun utilisateur interne).
+# authHTTPAddress = http://peripheriques-backend:8000/api/media-auth/?key=<MEDIA_HOOK_KEY>
+#   (posé par entrypoint.sh). authHTTPExclude vide : publish, read, playback, api inclus.
+authMethod: http
+authHTTPExclude: []
+
+###############################################################################
+# API (I4) et relecture (I4) — internes, jamais publiées ni routées par Caddy.
+api: yes
+apiAddress: :9997
+playback: yes
+playbackAddress: :9996
+metrics: no
+pprof: no
+
+###############################################################################
+# RTSP : uniquement pour la publication locale de ffmpeg (127.0.0.1). TCP seul : aucun port
+# UDP RTP/RTCP ouvert. Un « read » RTSP passe par le hook sans token => refusé.
+rtsp: yes
+rtspTransports: [tcp]
+rtspAddress: :8554
+rtmp: no
+srt: no
+moq: no
+
+###############################################################################
+# HLS — servi derrière Caddy (/peripheriques-hls/*). Chaque requête HTTP (playlist,
+# segment, part) est ré-authentifiée par le hook (vérifié sur 1.21.1).
+hls: yes
+hlsAddress: :8888
+hlsVariant: lowLatency
+hlsAlwaysRemux: no
+
+###############################################################################
+# WebRTC / WHEP — servi derrière Caddy (/peripheriques-webrtc/*), ICE en direct sur
+# MEDIA_WEBRTC_PORT (UDP+TCP, posés par entrypoint.sh) annoncé sur MEDIA_WEBRTC_HOSTS.
+# Les IP d'interfaces du conteneur (réseaux Docker internes) ne sont pas annoncées.
+webrtc: yes
+webrtcAddress: :8889
+webrtcIPsFromInterfaces: no
+
+###############################################################################
+pathDefaults:
+  source: publisher
+  overridePublisher: no
+  record: no
+
+# Aucun chemin générique : tout chemin non listé ici est refusé par MediaMTX.
+paths:
+  # Chemin enregistré (I1) + porteur de l'unique processus ffmpeg (publish.sh).
+  webcam/av:
+    record: yes
+    recordFormat: fmp4
+    recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+    recordSegmentDuration: 1h
+    recordDeleteAfter: 7d
+    runOnInit: sh /opt/peripheriques/publish.sh
+    runOnInitRestart: yes
+  webcam/video:
+  webcam/audio:

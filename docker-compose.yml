@@ -1,0 +1,79 @@
+version: "3.9"
+
+volumes:
+  # Enregistrements horaires (7 j, ~11 Go/j) — external : survit à clean2.sh (voir CLAUDE.md,
+  # « Fichiers rasters / médias »). Dérogation assumée à la règle storage : flux machine écrit
+  # directement par MediaMTX (chantiers/peripheriques/CONTRAT.md §1).
+  peripheriques-recordings:
+    external: true
+    name: peripheriques-recordings
+
+networks:
+  sso-net:
+    external: true
+    name: sso-lab_sso-net
+  dev-net:
+    external: true
+    name: dev-net
+
+services:
+
+  backend:
+    build: ./backend
+    container_name: peripheriques-backend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8101:8000"
+    volumes:
+      - peripheriques-recordings:/recordings:ro
+    networks:
+      - sso-net
+      - dev-net
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.handle_path: "/peripheriques-api/*"
+      caddy.handle_path.reverse_proxy: "{{upstreams 8000}}"
+
+  frontend:
+    build: ./frontend
+    container_name: peripheriques-frontend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "4216:80"
+    networks:
+      - sso-net
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.handle_path: "/peripheriques/*"
+      caddy.handle_path.reverse_proxy: "{{upstreams 80}}"
+
+  # Seul détenteur de la webcam et du micro (un V4L2 ne s'ouvre qu'une fois) : direct ET
+  # enregistrement consomment ce flux. Contrat : chantiers/peripheriques/CONTRAT.md (I1, I4, I6).
+  media:
+    build: ./media
+    container_name: peripheriques-media
+    restart: unless-stopped
+    env_file: .env
+    devices:
+      - "${MEDIA_DEVICE_VIDEO}:/dev/video0"
+      - "/dev/snd:/dev/snd"
+    group_add:
+      - "44"   # video (hôte)
+      - "29"   # audio (hôte)
+    volumes:
+      - peripheriques-recordings:/recordings
+    ports:
+      # ICE WebRTC uniquement. API (9997) et playback (9996) ne sont JAMAIS publiés.
+      - "8189:8189/udp"
+      - "8189:8189/tcp"
+    networks:
+      - sso-net
+      - dev-net
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.0_handle_path: "/peripheriques-webrtc/*"
+      caddy.0_handle_path.reverse_proxy: "{{upstreams 8889}}"
+      caddy.1_handle_path: "/peripheriques-hls/*"
+      caddy.1_handle_path.reverse_proxy: "{{upstreams 8888}}"

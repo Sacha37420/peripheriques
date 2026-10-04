@@ -1,0 +1,25 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr));
+  gap: var(--space-4);
+}
+
+.device { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.device-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+
+  h2 { font-size: var(--text-lg); margin-right: auto; }
+}
+
+.offline {
+  color: var(--text-mute);
+  font-size: var(--text-sm);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+}
+
