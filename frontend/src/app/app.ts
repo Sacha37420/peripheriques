@@ -34,11 +34,14 @@ export class AppComponent {
 
   private meService = inject(MeService);
 
-  /** « Droits » n'apparaît que pour un admin (/api/me/ → is_admin) ; la barrière réelle est le backend. */
+  /** « Droits » et « Matériel conseillé » n'apparaissent que pour un admin (/api/me/ → is_admin) ; la barrière réelle est le backend. */
   readonly navItems = computed<NavItem[]>(() => [
     { path: '/',                label: 'Direct',          abbr: 'Di', exact: true },
     { path: '/enregistrements', label: 'Enregistrements', abbr: 'En' },
-    ...(this.meService.me()?.is_admin ? [{ path: '/droits', label: 'Droits', abbr: 'Dr' }] : []),
+    ...(this.meService.me()?.is_admin ? [
+      { path: '/droits',   label: 'Droits',            abbr: 'Dr' },
+      { path: '/materiel', label: 'Matériel conseillé', abbr: 'Ma' },
+    ] : []),
   ]);
 
   constructor() {

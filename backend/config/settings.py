@@ -203,6 +203,13 @@ RECORDING_TICKET_MAX_AGE = 300
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'handlers': {'console': {'class': 'logging.StreamHandler'}},
+    # v5 : masque `?key=` / `?ticket=` (cf. api/log_filters.py, qui pose aussi
+    # ce filtre sur django.server / gunicorn.access au démarrage).
+    'filters': {'redact': {'()': 'api.log_filters.RedactSecretsFilter'}},
+    'handlers': {'console': {'class': 'logging.StreamHandler', 'filters': ['redact']}},
     'loggers': {'api': {'handlers': ['console'], 'level': 'INFO'}},
 }
+
+# Catalogue « Matériel conseillé » (contrat I7, v6) — servi tel quel aux admins
+# par /api/admin/materiel/, relu à chaque requête.
+MATERIEL_PATH = os.path.join(BASE_DIR, 'api', 'data', 'materiel.json')

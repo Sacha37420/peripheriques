@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api.service';
-import { Device, Grant, GrantPatch, apiErrorMessages } from '../../core/models';
+import { Grant, GrantDevice, GrantPatch, apiErrorMessages } from '../../core/models';
 import { fmtDateTime } from '../../core/paris-time';
 
 type Cap = 'video' | 'audio';
@@ -19,7 +19,7 @@ export class GrantsComponent implements OnInit {
   readonly loading = signal(true);
   readonly loadErrors = signal<string[]>([]);
   readonly grants = signal<Grant[]>([]);
-  readonly devices = signal<Device[]>([]);
+  readonly devices = signal<GrantDevice[]>([]);
   private readonly deviceLabels = computed(
     () => new Map(this.devices().map(d => [d.slug, d.label] as const)),
   );
@@ -45,7 +45,7 @@ export class GrantsComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.loadErrors.set([]);
-    forkJoin({ grants: this.api.getGrants(), devices: this.api.getDevices() }).subscribe({
+    forkJoin({ grants: this.api.getGrants(), devices: this.api.getGrantDevices() }).subscribe({
       next: ({ grants, devices }) => {
         this.grants.set(grants);
         this.devices.set(devices);

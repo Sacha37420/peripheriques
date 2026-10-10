@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
-  Device, Grant, GrantCreate, GrantPatch, Me, Segment, Ticket, TicketRequest, StreamKind,
+  Device, Grant, GrantCreate, GrantDevice, Materiel, GrantPatch, Me, Segment, Ticket, TicketRequest, StreamKind,
 } from './models';
 
 interface EnvWindow {
@@ -33,6 +33,11 @@ export class ApiService {
     return this.http.get<Device[]>(`${this.base}/api/devices/`);
   }
 
+  /** v4 — admin : TOUS les périphériques (sélecteur de la page Droits), indépendamment de tout Grant. */
+  getGrantDevices(): Observable<GrantDevice[]> {
+    return this.http.get<GrantDevice[]>(`${this.base}/api/grants/devices/`);
+  }
+
   getGrants(): Observable<Grant[]> {
     return this.http.get<Grant[]>(`${this.base}/api/grants/`);
   }
@@ -47,6 +52,11 @@ export class ApiService {
 
   deleteGrant(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/grants/${id}/`);
+  }
+
+  /** v6 — admin : catalogue matériel (I7), servi tel quel. 503 si indisponible. */
+  getMateriel(): Observable<Materiel> {
+    return this.http.get<Materiel>(`${this.base}/api/admin/materiel/`);
   }
 
   /** date = YYYY-MM-DD, journée Europe/Paris. */

@@ -56,13 +56,19 @@ services:
     container_name: peripheriques-media
     restart: unless-stopped
     env_file: .env
-    devices:
-      - "${MEDIA_DEVICE_VIDEO}:/dev/video0"
-      - "/dev/snd:/dev/snd"
+    # AUCUN `devices:` (contrat v5) : il fige major:minor à la création du conteneur, et une
+    # ré-énumération USB a déjà fait pointer la caméra sur son nœud métadonnées (Not a tty).
+    # Vue live de /dev + autorisation par majeur. Le `:ro` ne protège PAS les nœuds caractère :
+    # seules ces règles cgroup le font — ne jamais les élargir ni passer en privileged.
+    device_cgroup_rules:
+      - "c 81:* rmw"    # video4linux
+      - "c 116:* rmw"   # ALSA
     group_add:
       - "44"   # video (hôte)
       - "29"   # audio (hôte)
     volumes:
+      - /dev:/hostdev:ro          # le lien by-id suit les ré-énumérations
+      - /dev/snd:/dev/snd         # ALSA ne cherche que /dev/snd ; bind = vue live
       - peripheriques-recordings:/recordings
     ports:
       # ICE WebRTC uniquement. API (9997) et playback (9996) ne sont JAMAIS publiés.
@@ -75,5 +81,9 @@ services:
       caddy: "${DOMAIN}"
       caddy.0_handle_path: "/peripheriques-webrtc/*"
       caddy.0_handle_path.reverse_proxy: "{{upstreams 8889}}"
+      # MediaMTX renvoie des Location en chemin absolu sans le préfixe retiré par handle_path
+      # (session WHEP ; 302 « ?cookieCheck=1 » de HLS sur 1.21.1, qui cassait tout le repli HLS).
+      caddy.0_handle_path.reverse_proxy.header_down: "Location ^/ /peripheriques-webrtc/"
       caddy.1_handle_path: "/peripheriques-hls/*"
       caddy.1_handle_path.reverse_proxy: "{{upstreams 8888}}"
+      caddy.1_handle_path.reverse_proxy.header_down: "Location ^/ /peripheriques-hls/"

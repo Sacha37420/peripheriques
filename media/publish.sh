@@ -10,12 +10,16 @@ set -eu
 # Attendre caméra + carte son (sysfs seulement, rien n'est ouvert) — voir wait-devices.sh.
 sh /opt/peripheriques/wait-devices.sh || exit 1
 
+# Lien by-id de l'hôte relu sous /hostdev (montage live, contrat v5) : résolu à CHAQUE
+# lancement, il suit les ré-énumérations USB. Jamais de /dev/video0 figé.
+VIDEO_IN="/hostdev${MEDIA_DEVICE_VIDEO#/dev}"
+
 SLUG=webcam
 BASE="rtsp://${MEDIA_PUBLISH_USER}:${MEDIA_PUBLISH_PASSWORD}@127.0.0.1:8554/${SLUG}"
 
 exec ffmpeg -hide_banner -nostdin -loglevel warning \
   -thread_queue_size 64 \
-  -f v4l2 -input_format mjpeg -video_size 1280x720 -timestamps mono2abs -i /dev/video0 \
+  -f v4l2 -input_format mjpeg -video_size 1280x720 -timestamps mono2abs -i "${VIDEO_IN}" \
   -thread_queue_size 1024 \
   -f alsa -channels 1 -sample_rate 48000 -i "${MEDIA_DEVICE_AUDIO}" \
   -map 0:v:0 -map 1:a:0 \

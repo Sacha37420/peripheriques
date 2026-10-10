@@ -1,0 +1,113 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Matériel conseillé</h1>
+      <p class="subtitle">Références de périphériques adaptés à ce service — réservé aux administrateurs.</p>
+    </div>
+    <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">Actualiser</button>
+  </header>
+
+  @if (loading()) {
+    <p class="loading-msg">Chargement du catalogue…</p>
+  } @else if (unavailable()) {
+    <div class="card" role="alert" data-test="materiel-unavailable">
+      <p class="error-msg">Catalogue matériel indisponible.</p>
+    </div>
+  } @else if (errors().length) {
+    <div class="card" role="alert">
+      @for (msg of errors(); track $index) { <p class="error-msg">{{ msg }}</p> }
+    </div>
+  } @else if (data(); as d) {
+    @if (d.summary.length) {
+      <div class="card summary" data-test="materiel-summary">
+        <h2>Synthèse</h2>
+        @for (p of d.summary; track $index) { <p>{{ p }}</p> }
+        @if (d.updated) { <p class="updated">Mis à jour le {{ updatedLabel() }}</p> }
+      </div>
+    }
+
+    @if (!d.items.length) {
+      <div class="card" data-test="materiel-empty"><p class="empty-msg">Catalogue en cours de constitution.</p></div>
+    } @else {
+      @for (g of groups(); track g.title) {
+        <section class="family" [attr.data-family]="g.key">
+          <h2>{{ g.title }}</h2>
+          @if (g.desc) { <p class="subtitle">{{ g.desc }}</p> }
+          <div class="items">
+            @for (i of g.items; track trackItem(i)) {
+              <article class="card item" data-test="materiel-item">
+                <header class="item-head">
+                  <div>
+                    <h3>{{ i.name }}</h3>
+                    <p class="brand">{{ i.brand }}</p>
+                  </div>
+                  <span class="badge" [class]="'badge ' + verdictClass(i.verdict)" data-test="verdict">{{ i.verdict }}</span>
+                </header>
+
+                <p class="continuous" [class]="'continuous ' + continuous(i.continuous_24_7).cls" data-test="continuous">
+                  Enregistrement continu 24/7 : <strong>{{ continuous(i.continuous_24_7).text }}</strong>
+                </p>
+
+                <ul class="tags">
+                  <li [class.off]="!i.battery">🔋 {{ i.battery ? 'Batterie' : 'Sans batterie' }}</li>
+                  @if (i.night_vision) { <li>🌙 {{ i.night_vision }}</li> } @else { <li class="off">🌙 Pas de vision nocturne</li> }
+                  @if (i.tracking) { <li>🎯 {{ i.tracking }}</li> } @else { <li class="off">🎯 Pas de suivi</li> }
+                  @if (i.audio) { <li>🎤 {{ i.audio }}</li> } @else { <li class="off">🎤 Pas de son</li> }
+                </ul>
+
+                <dl class="specs">
+                  <dt>Connexion</dt><dd>{{ i.connection }}</dd>
+                  <dt>Alimentation</dt><dd>{{ i.power }}</dd>
+                  <dt>Flux</dt><dd>{{ i.rtsp_or_uvc }}</dd>
+                  <dt>Codec</dt><dd>{{ i.codec }}</dd>
+                  <dt>Prix indicatif</dt><dd>{{ i.price_eur ?? 'non communiqué' }}</dd>
+                </dl>
+
+                @if (i.caveats.length) {
+                  <div class="caveats">
+                    <h4>Réserves</h4>
+                    <ul>@for (c of i.caveats; track $index) { <li>{{ c }}</li> }</ul>
+                  </div>
+                }
+
+                @if (i.links.length) {
+                  <div class="links">
+                    <h4>Où acheter</h4>
+                    <ul>
+                      @for (l of i.links; track $index) {
+                        <li>
+                          @if (isHttps(l.url)) {
+                            <a class="btn btn-ghost" [href]="l.url" target="_blank" rel="noopener noreferrer" data-test="buy-link">{{ l.label }} ↗</a>
+                          } @else {
+                            <span class="raw" data-test="raw-link">{{ l.label }} — {{ l.url }}</span>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+
+                @if (i.sources.length) {
+                  <details class="sources">
+                    <summary>Sources ({{ i.sources.length }})</summary>
+                    <ul>
+                      @for (s of i.sources; track $index) {
+                        <li>
+                          @if (isHttps(s)) {
+                            <a [href]="s" target="_blank" rel="noopener noreferrer" data-test="source-link">{{ s }}</a>
+                          } @else {
+                            <span class="raw">{{ s }}</span>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  </details>
+                }
+              </article>
+            }
+          </div>
+        </section>
+      }
+    }
+  }
+</section>

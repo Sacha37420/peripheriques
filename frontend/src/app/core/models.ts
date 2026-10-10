@@ -22,6 +22,13 @@ export interface Device {
   audio: Capability;
 }
 
+/** GET /api/grants/devices/ (admin, v4) : tous les périphériques, pour la gestion des droits uniquement. */
+export interface GrantDevice {
+  slug: string;
+  label: string;
+  online: boolean;
+}
+
 export interface Grant {
   id: number;
   email: string;
@@ -98,4 +105,35 @@ export function apiErrorMessages(err: unknown): string[] {
     out.push(e?.status ? `Erreur ${e.status}` : 'Erreur réseau — serveur injoignable.');
   }
   return out;
+}
+
+// ── I7 — Catalogue matériel (v6, admin) ────────────────────────────────
+export type MaterielFamily = 'A' | 'B' | 'C';
+export type Continuous247 = 'oui' | 'non' | 'seulement sur secteur' | 'non confirmé';
+export type MaterielVerdict = 'recommandé' | 'possible' | 'déconseillé pour ce service';
+
+export interface MaterielItem {
+  name: string;
+  brand: string;
+  family: MaterielFamily;
+  connection: string;
+  power: string;
+  battery: boolean;
+  night_vision: string | null;
+  tracking: string | null;
+  audio: string | null;
+  rtsp_or_uvc: string;
+  continuous_24_7: Continuous247;
+  codec: string;
+  price_eur: string | null;
+  links: { label: string; url: string }[];
+  sources: string[];
+  caveats: string[];
+  verdict: MaterielVerdict;
+}
+
+export interface Materiel {
+  updated: string;
+  summary: string[];
+  items: MaterielItem[];
 }

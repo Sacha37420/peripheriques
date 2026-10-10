@@ -18,5 +18,11 @@ export const routes: Routes = [
     canActivate: [adminGuard],
     loadComponent: () => import('./pages/grants/grants.component').then(m => m.GrantsComponent),
   },
+  {
+    path: 'materiel',
+    title: 'Matériel conseillé — Périphériques',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./pages/materiel/materiel.component').then(m => m.MaterielComponent),
+  },
   { path: '**', redirectTo: '' },
 ];

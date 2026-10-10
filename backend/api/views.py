@@ -1,7 +1,12 @@
+import json
 import logging
+
+from django.conf import settings
+from django.http import HttpResponse
 
 from django.db import transaction
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -58,6 +63,18 @@ class GrantViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
     queryset = Grant.objects.select_related('device')
     permission_classes = [IsPeripheriquesAdmin]
     http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+    @action(detail=False, methods=['get'], url_path='devices')
+    def devices(self, request):
+        """GET /api/grants/devices/ (v4) — TOUS les périphériques, pour le
+        sélecteur de la page Droits, indépendamment de tout Grant. Sans elle, un
+        admin sans Grant ne pouvait accorder aucun droit, même à lui-même.
+        Route de liste : le SimpleRouter la déclare avant `grants/<pk>/`."""
+        return Response([
+            {'slug': d.slug, 'label': d.label,
+             'online': media_client.path_ready(f'{d.slug}/av')}
+            for d in Device.objects.all()
+        ])
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -117,3 +134,25 @@ class GrantViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         grant.delete()
         kick_revoked(email, slug)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MaterielView(APIView):
+    """GET /api/admin/materiel/ (v6, admins) — catalogue I7 servi tel quel.
+
+    Relu à chaque requête, sans cache : quelques ko, page consultée rarement,
+    et un cache par processus serverait un contenu périmé après mise à jour.
+    Le JSON est seulement validé syntaxiquement ; les octets du fichier sont
+    renvoyés sans transformation.
+    """
+
+    permission_classes = [IsPeripheriquesAdmin]
+
+    def get(self, request):
+        try:
+            with open(settings.MATERIEL_PATH, 'rb') as fh:
+                raw = fh.read()
+            json.loads(raw)
+        except (OSError, ValueError) as exc:
+            log.error('Catalogue matériel illisible (%s) : %s', settings.MATERIEL_PATH, exc)
+            return Response({'detail': 'Catalogue matériel indisponible.'}, status=503)
+        return HttpResponse(raw, content_type='application/json')

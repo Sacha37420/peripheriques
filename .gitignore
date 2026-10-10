@@ -9,7 +9,9 @@ __pycache__/
 .venv/
 venv/
 db.sqlite3
-/backend/media/  # (pas « media/ » : peripheriques/media/ est le service MediaMTX, il doit être versionné)
+# « /backend/media/ » et non « media/ » : peripheriques/media/ est le service MediaMTX, il doit
+# être versionné. (Commentaire sur sa propre ligne : git n'accepte pas de commentaire en fin de motif.)
+/backend/media/
 
 # ── Angular / Node (racine si app Angular seul, frontend/ si +Angular) ────────
 node_modules/

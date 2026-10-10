@@ -282,3 +282,50 @@ class MediaClientEndpointTests(TestCase):
             self.assertEqual(post.call_args.kwargs['auth'], ('backend', 'int-secret'))
         with self.assertRaises(KeyError):
             media_client.kick_session('rtsp', 'abc')
+
+
+@patch_jwks()
+@mock.patch('api.media_client.path_ready', return_value=True)
+class GrantDevicesTests(TestCase):
+    """GET /api/grants/devices/ (v4)."""
+
+    def test_admin_without_grant_sees_all_devices(self, ready):
+        r = self.client.get('/api/grants/devices/', **bearer(admin_token()))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), [{'slug': 'webcam', 'label': 'Webcam (vidéo + micro)',
+                                     'online': True}])
+        ready.assert_called_once_with('webcam/av')
+        # /api/devices/ reste v3 : rien pour un admin sans Grant
+        self.assertEqual(self.client.get('/api/devices/', **bearer(admin_token())).json(), [])
+
+    def test_offline(self, ready):
+        ready.return_value = False
+        r = self.client.get('/api/grants/devices/', **bearer(admin_token()))
+        self.assertFalse(r.json()[0]['online'])
+
+    def test_non_admin_403(self, _ready):
+        Grant.objects.create(email=MEMBER, device_id='webcam', video=True,
+                             video_since=timezone.now(), granted_by=ADMIN)
+        self.assertEqual(self.client.get('/api/grants/devices/', **bearer(make_token())).status_code, 403)
+        tok = make_token(ADMIN, groups=('developers',), azp='admin-cli')
+        self.assertIn(self.client.get('/api/grants/devices/', **bearer(tok)).status_code, (401, 403))
+
+    def test_read_only(self, _ready):
+        r = self.client.post('/api/grants/devices/', data={}, content_type='application/json',
+                             **bearer(admin_token()))
+        self.assertEqual(r.status_code, 405)
+
+    @mock.patch.object(keycloak_admin, 'find_user_by_email', return_value={'id': 'u1'})
+    @mock.patch('api.media_client.list_sessions', return_value=[])
+    def test_detail_routes_unaffected(self, _live, _kc, _ready):
+        adm = bearer(admin_token())
+        self.assertEqual(self.client.get('/api/grants/', **adm).json(), [])
+        g = self.client.post('/api/grants/', data={'email': MEMBER, 'device': 'webcam', 'video': True},
+                             content_type='application/json', **adm).json()
+        url = f"/api/grants/{g['id']}/"
+        self.assertEqual(self.client.get(url, **adm).json()['email'], MEMBER)
+        r = self.client.patch(url, data={'audio': True}, content_type='application/json', **adm)
+        self.assertEqual((r.status_code, r.json()['audio']), (200, True))
+        self.assertEqual(self.client.delete(url, **adm).status_code, 204)
+        self.assertEqual(self.client.get(url, **adm).status_code, 404)
+        self.assertEqual(self.client.get('/api/grants/999/', **adm).status_code, 404)

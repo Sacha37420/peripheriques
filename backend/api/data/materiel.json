@@ -1,0 +1,289 @@
+{
+  "updated": "2026-10-04",
+  "summary": [
+    "La famille B en version SECTEUR (caméra Wi-Fi/Ethernet pan-tilt avec RTSP H.264 autonome) est la plus adaptée : Tapo C210/C225 et Reolink E330 documentent RTSP sans hub, H.264, IR 9-12 m, suivi automatique et audio bidirectionnel, pour 24-70 EUR chez Boulanger ; MediaMTX peut les relayer sans transcodage.",
+    "La famille A (caméra sans fil + dongle USB vu comme webcam UVC) existe à peine : deux produits trouvés, un VGA en rupture (Pearl), l'autre sans marque (AirCam), sans fiche UVC/chipset ni test Linux publié, 3 h d'autonomie. On ne peut pas la recommander pour un service 24/7.",
+    "Batterie et enregistrement continu sont en tension directe : Reolink écrit que ses caméras batterie ne gèrent pas RTSP en autonome et, via Home Hub, coupent le flux après 5 minutes de mise en veille ; TP-Link exclut RTSP sur ses caméras batterie C410/C420/C425 ; les dépôts d'issues Frigate confirment qu'un flux continu vide la batterie.",
+    "Seules exceptions partielles : la Reolink Argus MagiCam (24/7 seulement sur alimentation CC, RTSP seulement via Home Hub) et l'Altas PT Ultra (enregistrement continu sur carte SD/Home Hub, environ 8 jours sur batterie ou avec soleil) ; aucune des deux ne documente un flux RTSP continu au-delà de la limite de 5 minutes. Une batterie servirait donc au mieux d'onduleur.",
+    "Si la webcam actuelle doit être conservée, un hub USB alimenté par bloc secteur (famille C, 25-34 EUR chez LDLC) est le correctif le moins cher de la déconnexion par sous-alimentation, mais n'apporte ni sans-fil, ni vision nocturne, ni suivi."
+  ],
+  "items": [
+    {
+      "name": "AirCam Webcam Sans Fil Wifi 2.4Ghz",
+      "brand": "OfficeEasy Selection (produit sans marque identifiée)",
+      "family": "A",
+      "connection": "Liaison radio 2,4 GHz vers un dongle USB (portée annoncée : 20 m en intérieur)",
+      "power": "batterie+secteur",
+      "battery": true,
+      "night_vision": null,
+      "tracking": null,
+      "audio": "Micro mono intégré",
+      "rtsp_or_uvc": "Le vendeur annonce « Plug & Play, compatible Windows, Vista, Linux, Mac, Android ». Le mot UVC n'apparaît pas et aucun VID:PID ni chipset n'est publié.",
+      "continuous_24_7": "non confirmé",
+      "codec": "Non précisé (1080p à 30 i/s ; probablement MJPEG ou YUV via UVC, non vérifié)",
+      "price_eur": "99,99 EUR (prix barré 150 EUR) relevé le 2026-10-04 sur officeeasy.fr",
+      "links": [{"label": "OfficeEasy (fiche produit)", "url": "https://www.officeeasy.fr/webcam-sans-fil-wifi.html"}],
+      "sources": ["https://www.officeeasy.fr/webcam-sans-fil-wifi.html"],
+      "caveats": [
+        "Autonomie de 3 h seulement. Le vendeur dit qu'elle fonctionne en charge par USB-C, ce qui annule l'intérêt de la batterie en 24/7.",
+        "Le fonctionnement UVC/UAC sous Linux n'est pas démontré : il faudrait vérifier lsusb et v4l2-ctl --list-formats-ext à réception (prévoir un achat avec droit de retour).",
+        "Ni vision nocturne ni suivi.",
+        "Une liaison radio 2,4 GHz sur un ou deux dongles peut subir les interférences du Wi-Fi. Aucune donnée de fiabilité sur plusieurs jours n'a été trouvée."
+      ],
+      "verdict": "possible"
+    },
+    {
+      "name": "Webcam à ondes radio 2,4 GHz WWC-2400F",
+      "brand": "Pearl",
+      "family": "A",
+      "connection": "Liaison radio 2,4 GHz vers un récepteur USB (portée de 3 m)",
+      "power": "batterie",
+      "battery": true,
+      "night_vision": null,
+      "tracking": null,
+      "audio": "Micro intégré",
+      "rtsp_or_uvc": "« Plug & Play : aucun pilote nécessaire pour Windows XP / Vista / 7 ». Linux n'est pas mentionné.",
+      "continuous_24_7": "non",
+      "codec": "VGA 640x480 (format USB non précisé)",
+      "price_eur": null,
+      "links": [{"label": "Pearl.fr (fiche produit, en rupture)", "url": "https://www.pearl.fr/article/PX8111/webcam-a-ondes-radio-2-4-ghz-wwc-2400f"}],
+      "sources": ["https://www.pearl.fr/article/PX8111/webcam-a-ondes-radio-2-4-ghz-wwc-2400f"],
+      "caveats": ["En rupture de stock au 2026-10-04.", "Produit ancien (Windows XP/7), en VGA.", "Autonomie de 4 h."],
+      "verdict": "déconseillé pour ce service"
+    },
+    {
+      "name": "Tapo C210 (2K)",
+      "brand": "TP-Link Tapo",
+      "family": "B",
+      "connection": "Wi-Fi 2,4 GHz (802.11b/g/n)",
+      "power": "secteur",
+      "battery": false,
+      "night_vision": "IR 850 nm, jusqu'à 9 m",
+      "tracking": "Pan 340° / tilt 70° motorisés, suivi de mouvement",
+      "audio": "Micro et haut-parleur, audio bidirectionnel (le bidirectionnel ne passe pas par ONVIF Profile S)",
+      "rtsp_or_uvc": "RTSP oui, ONVIF oui ; rtsp://user:pass@IP:554/stream1 (HD) et /stream2 (SD)",
+      "continuous_24_7": "oui",
+      "codec": "H.264, 2304x1296, 15 i/s (compatible WebRTC sans transcodage)",
+      "price_eur": "23,99 EUR chez Boulanger le 2026-10-04",
+      "links": [
+        {"label": "Boulanger", "url": "https://www.boulanger.com/ref/1172076"},
+        {"label": "Fiche fabricant Tapo", "url": "https://www.tapo.com/fr/product/smart-camera/tapo-c210/"}
+      ],
+      "sources": ["https://www.tapo.com/fr/product/smart-camera/tapo-c210/", "https://www.tp-link.com/fr/support/faq/4465/", "https://www.boulanger.com/ref/1172076"],
+      "caveats": [
+        "FAQ TP-Link : Tapo Care, carte SD et NVR/ONVIF ne peuvent pas fonctionner tous les trois en même temps (deux au maximum). Désactiver Tapo Care ou l'enregistrement SD pour garder le RTSP.",
+        "Un compte caméra (identifiants RTSP) doit être créé dans l'application Tapo, ce qui demande une configuration initiale par l'application.",
+        "Intérieur uniquement (avis client Boulanger)."
+      ],
+      "verdict": "recommandé"
+    },
+    {
+      "name": "Tapo C225 (2K)",
+      "brand": "TP-Link Tapo",
+      "family": "B",
+      "connection": "Wi-Fi 6 2,4 GHz (802.11b/g/n/ax)",
+      "power": "secteur",
+      "battery": false,
+      "night_vision": "Capteur Starlight (couleur en faible lumière), IR 850 nm et 940 nm (mode invisible), 9 m",
+      "tracking": "Pan 360° / tilt 149°, suivi IA (personne, animal, véhicule) à 120°/s",
+      "audio": "Micro et haut-parleur, audio bidirectionnel avec réduction de bruit",
+      "rtsp_or_uvc": "RTSP et ONVIF annoncés sur la fiche fabricant",
+      "continuous_24_7": "oui",
+      "codec": "H.264, 2688x1520",
+      "price_eur": "69,90 EUR chez Boulanger le 2026-10-04",
+      "links": [
+        {"label": "Boulanger", "url": "https://www.boulanger.com/ref/1206657"},
+        {"label": "Fiche fabricant Tapo", "url": "https://www.tapo.com/fr/product/smart-camera/tapo-c225/"}
+      ],
+      "sources": ["https://www.tapo.com/fr/product/smart-camera/tapo-c225/", "https://www.tp-link.com/fr/support/faq/4465/", "https://www.boulanger.com/ref/1206657"],
+      "caveats": [
+        "Même limite que la C210 : deux usages au maximum parmi Tapo Care, carte SD et RTSP/ONVIF.",
+        "Boulanger ne mentionne pas RTSP ; l'information vient de la fiche Tapo.",
+        "Wi-Fi 2,4 GHz seulement."
+      ],
+      "verdict": "recommandé"
+    },
+    {
+      "name": "Reolink E330 (gamme E1 Pro)",
+      "brand": "Reolink",
+      "family": "B",
+      "connection": "Wi-Fi bi-bande 2,4/5 GHz ou Ethernet RJ45",
+      "power": "secteur",
+      "battery": false,
+      "night_vision": "IR 850 nm (10 LED), 12 m, noir et blanc",
+      "tracking": "Pan 355° / tilt 55° motorisés, suivi automatique",
+      "audio": "Micro et haut-parleur, audio bidirectionnel",
+      "rtsp_or_uvc": "RTSP, RTMP et ONVIF en autonome, sans hub (tableau officiel Reolink) ; rtsp://user:pass@IP/Preview_01_main|sub",
+      "continuous_24_7": "oui",
+      "codec": "H.264 (fiche Galaxus pour l'E330 4 MP). Pour la version « 3K » vendue chez Boulanger, le codec n'est pas confirmé.",
+      "price_eur": "39,99 EUR chez Boulanger le 2026-10-04",
+      "links": [{"label": "Boulanger", "url": "https://www.boulanger.com/ref/1218835"}],
+      "sources": ["https://support.reolink.com/articles/900000617826-Which-Reolink-Products-Support-CGI-RTSP-ONVIF/", "https://support.reolink.com/articles/900000630706-Introduction-to-RTSP/", "https://www.boulanger.com/ref/1218835", "https://www.galaxus.fr/en/s1/product/reolink-e330-2560-x-1440-pixels-network-camera-12213825"],
+      "caveats": [
+        "Résolutions incohérentes entre sources : Boulanger annonce 2880x1616 (« 3K »), Galaxus 2560x1440 (4 MP). Il existe peut-être deux révisions. Vérifier le codec du flux principal après réception (ffprobe).",
+        "Le port Ethernet permet de supprimer complètement le risque Wi-Fi.",
+        "Ne pas confondre avec l'E1 et les E320/E321, qui exigent un Home Hub ou un NVR pour le RTSP."
+      ],
+      "verdict": "recommandé"
+    },
+    {
+      "name": "Reolink E540 (extérieur, zoom optique 3x)",
+      "brand": "Reolink",
+      "family": "B",
+      "connection": "Wi-Fi 2,4/5 GHz ou Ethernet RJ45",
+      "power": "secteur",
+      "battery": false,
+      "night_vision": "Couleur (projecteurs intégrés) ou IR, 12 m",
+      "tracking": "Pan 355° / tilt 50°, suivi automatique",
+      "audio": "Micro et haut-parleur, audio bidirectionnel",
+      "rtsp_or_uvc": "RTSP, RTMP et ONVIF (fiche Boulanger)",
+      "continuous_24_7": "oui",
+      "codec": "Non confirmé. La fiche Boulanger ne le donne pas ; le modèle proche E1 Outdoor Pro est annoncé en H.264/H.265.",
+      "price_eur": "99,99 EUR chez Boulanger le 2026-10-04",
+      "links": [{"label": "Boulanger", "url": "https://www.boulanger.com/ref/1218832"}],
+      "sources": ["https://www.boulanger.com/ref/1218832", "https://reolink.com/fr/product/e1-outdoor-pro/"],
+      "caveats": [
+        "Si le flux principal est en H.265, le WebRTC navigateur ne le lira pas sans transcodage. Utiliser le sous-flux H.264 ou forcer H.264 dans les réglages.",
+        "IP65, utilisable en extérieur.",
+        "Pas de page Reolink FR consultée pour l'E540 lui-même."
+      ],
+      "verdict": "possible"
+    },
+    {
+      "name": "Reolink Argus MagiCam",
+      "brand": "Reolink",
+      "family": "B",
+      "connection": "Wi-Fi bi-bande 2,4/5 GHz",
+      "power": "batterie+secteur",
+      "battery": true,
+      "night_vision": "1 LED IR 850 nm",
+      "tracking": null,
+      "audio": "Audio bidirectionnel",
+      "rtsp_or_uvc": "Pas de RTSP en autonome : « le protocole RTSP est pris en charge par le Reolink Home Hub » (hub à acheter en plus)",
+      "continuous_24_7": "seulement sur secteur",
+      "codec": "H.264, 1080p (15 i/s sur piles, 20 i/s sur secteur)",
+      "price_eur": null,
+      "links": [{"label": "Site fabricant Reolink (FR)", "url": "https://reolink.com/fr/product/argus-magicam/"}],
+      "sources": ["https://reolink.com/product/argus-magicam/", "https://reolink.com/fr/product/argus-magicam/", "https://support.reolink.com/articles/900000630706-Introduction-to-RTSP/"],
+      "caveats": [
+        "Fonctionne sur piles AA lithium non rechargeables. Le câble USB-C (5 V/1 A) n'alimente que la caméra et ne recharge pas les piles.",
+        "« Enregistrement continu 24h/24 lorsqu'elle est connectée à une alimentation CC ». Il n'est pas confirmé que le RTSP du Home Hub échappe à la coupure de 5 minutes documentée pour les caméras batterie.",
+        "Ni pan/tilt motorisé ni suivi.",
+        "Prix non affiché sur la page fabricant."
+      ],
+      "verdict": "possible"
+    },
+    {
+      "name": "Reolink Altas PT Ultra",
+      "brand": "Reolink",
+      "family": "B",
+      "connection": "Wi-Fi 6 bi-bande 2,4/5 GHz",
+      "power": "batterie",
+      "battery": true,
+      "night_vision": "ColorX : vision nocturne en couleur (capteur 1/1,8\", F1.0, sans IR)",
+      "tracking": "Pan 355° / tilt 90°, suivi automatique",
+      "audio": "Audio bidirectionnel",
+      "rtsp_or_uvc": "Pas de RTSP en autonome. La famille Altas figure parmi les caméras batterie qui exigent un Home Hub pour le RTSP (tableau officiel Reolink).",
+      "continuous_24_7": "non confirmé",
+      "codec": "H.264/H.265 (4K enregistré en H.265 selon un test publié)",
+      "price_eur": "Prix public 209,99 EUR, vu à 156,99 EUR en promotion (lecafedugeek.fr, test du 2024-10-17). Aucune fiche marchand FR ouverte.",
+      "links": [{"label": "Site fabricant Reolink (FR)", "url": "https://reolink.com/fr/product/altas-pt-ultra/"}],
+      "sources": ["https://reolink.com/product/altas-pt-ultra/", "https://reolink.com/fr/product/altas-pt-ultra/", "https://support.reolink.com/articles/900000420323-Which-Reolink-Cameras-Support-Continuous-Recording/", "https://support.reolink.com/articles/900000617826-Which-Reolink-Products-Support-CGI-RTSP-ONVIF/", "https://lecafedugeek.fr/test-reolink-altas-pt-ultra-la-camera-de-securite-4k-ultime/", "https://mariushosting.com/?p=77272", "https://github.com/blakeblackshear/frigate/discussions/22019"],
+      "caveats": [
+        "Seule caméra batterie trouvée qui coche tout le reste (enregistrement continu, couleur la nuit, suivi, audio). Mais cet enregistrement continu va sur sa carte SD ou sur le Home Hub, pas vers MediaMTX.",
+        "Reolink : via Home Hub, le flux RTSP d'une caméra batterie dure 5 minutes au maximum avant la mise en veille. Aucune source ne dit que l'Altas fait exception.",
+        "Autonomie annoncée : environ 8 jours en continu (12 h/jour selon la FAQ Reolink FR), sinon panneau solaire avec 5 h de soleil direct par jour, ce qui ne vaut pas pour un usage en intérieur.",
+        "En H.265, pas de WebRTC navigateur sans transcodage."
+      ],
+      "verdict": "déconseillé pour ce service"
+    },
+    {
+      "name": "Tapo C420 (kit 2 caméras + hub H100)",
+      "brand": "TP-Link Tapo",
+      "family": "B",
+      "connection": "Wi-Fi",
+      "power": "batterie",
+      "battery": true,
+      "night_vision": "Couleur Starlight, plus noir et blanc",
+      "tracking": null,
+      "audio": "Audio bidirectionnel",
+      "rtsp_or_uvc": "Pas de RTSP : la FAQ TP-Link exclut nommément les C410, C420, C425 et D230 (« limitations de conception batterie et électronique »)",
+      "continuous_24_7": "non",
+      "codec": "Non vérifié",
+      "price_eur": "161,99 EUR le kit chez Boulanger le 2026-10-04",
+      "links": [{"label": "Boulanger", "url": "https://www.boulanger.com/ref/1190589"}],
+      "sources": ["https://www.tp-link.com/fr/support/faq/4465/", "https://www.boulanger.com/ref/1190589"],
+      "caveats": [
+        "Exemple type de caméra batterie inutilisable avec MediaMTX.",
+        "Seuls les visiophones D235, D225 et TD25 gèrent le RTSP, et seulement câblés en mode « toujours actif »."
+      ],
+      "verdict": "déconseillé pour ce service"
+    },
+    {
+      "name": "Reolink B440 + panneau solaire",
+      "brand": "Reolink",
+      "family": "B",
+      "connection": "Wi-Fi",
+      "power": "batterie",
+      "battery": true,
+      "night_vision": "IR 10 m, plus couleur avec projecteur",
+      "tracking": "Rotation motorisée 355°. Le suivi automatique n'est pas mentionné.",
+      "audio": "Audio bidirectionnel",
+      "rtsp_or_uvc": "Pas de RTSP en autonome pour les caméras batterie Reolink (doc officielle). Via Home Hub, coupure à 5 minutes.",
+      "continuous_24_7": "non",
+      "codec": "Non vérifié",
+      "price_eur": "172,71 EUR chez Boulanger (vendeur tiers Zoomici) le 2026-10-04",
+      "links": [{"label": "Boulanger (marketplace)", "url": "https://www.boulanger.com/ref/1218837"}],
+      "sources": ["https://www.boulanger.com/ref/1218837", "https://support.reolink.com/hc/en-us/articles/360004441753-Why-Reolink-Battery-Powered-Cameras-Cannot-Work-with-3rd-Party-Software/", "https://support.reolink.com/articles/900000630706-Introduction-to-RTSP/"],
+      "caveats": [
+        "Boulanger écrit « fonctionne sans interruption si branchée sur panneau solaire ». C'est une affirmation marketing de la marketplace, contredite par la doc Reolink sur le RTSP des caméras batterie."
+      ],
+      "verdict": "déconseillé pour ce service"
+    },
+    {
+      "name": "INOVU Hub USB 3.0 4 ports avec alimentation externe",
+      "brand": "INOVU",
+      "family": "C",
+      "connection": "USB-A (adaptateur USB-C fourni) vers le PC ; la webcam actuelle se branche sur le hub",
+      "power": "secteur",
+      "battery": false,
+      "night_vision": null,
+      "tracking": null,
+      "audio": null,
+      "rtsp_or_uvc": "Transparent : la webcam UVC/UAC actuelle reste vue telle quelle par V4L2/ALSA",
+      "continuous_24_7": "oui",
+      "codec": "Sans objet",
+      "price_eur": "24,95 EUR chez LDLC le 2026-10-04",
+      "links": [{"label": "LDLC", "url": "https://www.ldlc.com/fiche/PB00544468.html"}],
+      "sources": ["https://www.ldlc.com/fiche/PB00544468.html"],
+      "caveats": [
+        "Bloc 5 V/2 A (10 W) partagé entre les 4 ports. Le courant par port et le chipset ne sont pas publiés.",
+        "Corrige la sous-alimentation, mais pas les autres causes possibles de déconnexion (câble, autosuspend USB, firmware Jieli).",
+        "Ni sans-fil, ni vision nocturne, ni suivi."
+      ],
+      "verdict": "possible"
+    },
+    {
+      "name": "D-Link DUB-H7 (hub USB 2.0 7 ports alimenté)",
+      "brand": "D-Link",
+      "family": "C",
+      "connection": "USB 2.0 vers le PC ; la webcam se branche sur le hub",
+      "power": "secteur",
+      "battery": false,
+      "night_vision": null,
+      "tracking": null,
+      "audio": null,
+      "rtsp_or_uvc": "Transparent (UVC/UAC inchangé)",
+      "continuous_24_7": "oui",
+      "codec": "Sans objet",
+      "price_eur": "33,95 EUR chez LDLC le 2026-10-04 (livraison sous 7 jours)",
+      "links": [{"label": "LDLC", "url": "https://www.ldlc.com/fiche/PB00020885.html"}],
+      "sources": ["https://www.ldlc.com/fiche/PB00020885.html"],
+      "caveats": [
+        "Bloc 5 V/3 A (15 W). Une webcam USB 2.0 n'a pas besoin de l'USB 3.",
+        "Linux n'est pas mentionné par le vendeur (un hub USB standard ne demande en principe pas de pilote, non vérifié ici)."
+      ],
+      "verdict": "possible"
+    }
+  ]
+}
