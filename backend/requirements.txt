@@ -8,3 +8,4 @@ cryptography>=40.0
 django-cors-headers>=3.14.0
 requests>=2.31
 tzdata>=2024.1
+gunicorn>=23.0,<24.0
