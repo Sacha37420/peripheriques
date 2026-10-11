@@ -1,4 +1,8 @@
-"""API REST I3 hors relecture : /me, /devices, /grants (+ kick I4)."""
+"""API REST I3 hors relecture : /me, /devices, /grants (+ expulsion des lecteurs).
+
+Ici `api.media_client` est simulé fonction par fonction ; le client lui-même et
+les parcours complets face à lab-media sont dans `test_lab_media.py`.
+"""
 from datetime import timedelta
 from unittest import mock
 
@@ -261,27 +265,6 @@ class GrantTests(TestCase):
         with self.assertLogs('api.kick', 'WARNING'):
             self.assertEqual(self.patch(g.id, {'audio': False}).status_code, 200)
         self.assertTrue(MediaSession.objects.filter(id='s1').exists())
-
-
-class MediaClientEndpointTests(TestCase):
-    """Les bons endpoints I4 v2 sont appelés, en Basic internes."""
-
-    @mock.patch('api.media_client.requests.post')
-    @mock.patch('api.media_client.requests.get')
-    def test_endpoints(self, get, post):
-        from api import media_client
-        get.return_value = mock.Mock(status_code=200, json=lambda: {
-            'pageCount': 1, 'items': [{'id': 'a', 'path': 'webcam/av'}]})
-        post.return_value = mock.Mock(status_code=200)
-        for proto, ep in (('webrtc', 'webrtcsessions'), ('hls', 'hlssessions')):
-            self.assertEqual(media_client.list_sessions(proto), [{'id': 'a', 'path': 'webcam/av'}])
-            self.assertEqual(get.call_args.args[0], f'http://media-test:9997/v3/{ep}/list')
-            self.assertEqual(get.call_args.kwargs['auth'], ('backend', 'int-secret'))
-            media_client.kick_session(proto, 'abc')
-            self.assertEqual(post.call_args.args[0], f'http://media-test:9997/v3/{ep}/kick/abc')
-            self.assertEqual(post.call_args.kwargs['auth'], ('backend', 'int-secret'))
-        with self.assertRaises(KeyError):
-            media_client.kick_session('rtsp', 'abc')
 
 
 @patch_jwks()

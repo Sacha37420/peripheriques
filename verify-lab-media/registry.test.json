@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "_doc": "Registre de la pile de test de verify-lab-media.sh : l'app peripheriques, pointée sur un backend de test.",
+  "apps": {
+    "peripheriques": {
+      "prefixes": ["webcam"],
+      "read_hook": "http://lmt-periph-backend:8000/api/media-auth/"
+    }
+  },
+  "sources": {
+    "capture": {"paths": ["webcam/av", "webcam/video", "webcam/audio"]}
+  },
+  "paths": {
+    "webcam/av": {"record": true, "segment": "1h", "delete_after": "7d"},
+    "webcam/video": {},
+    "webcam/audio": {}
+  }
+}

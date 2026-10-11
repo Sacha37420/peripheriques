@@ -74,12 +74,13 @@ export class ApiService {
     return new URL(ticket.url, this.origin).toString();
   }
 
-  // ── I6 — URLs navigateur du serveur média (même origine que l'API, via Caddy) ──
+  // ── URLs navigateur de la brique lab-media (même origine que l'API, via Caddy) ──
+  // lab-media/API.md §3 : /lab-media-webrtc/<chemin>/whep et /lab-media-hls/<chemin>/index.m3u8.
   whepUrl(slug: string, kind: StreamKind): string {
-    return `${this.origin}/peripheriques-webrtc/${encodeURIComponent(slug)}/${kind}/whep`;
+    return `${this.origin}/lab-media-webrtc/${encodeURIComponent(slug)}/${kind}/whep`;
   }
 
   hlsUrl(slug: string, kind: StreamKind): string {
-    return `${this.origin}/peripheriques-hls/${encodeURIComponent(slug)}/${kind}/index.m3u8`;
+    return `${this.origin}/lab-media-hls/${encodeURIComponent(slug)}/${kind}/index.m3u8`;
   }
 }

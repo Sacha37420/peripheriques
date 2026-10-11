@@ -1,4 +1,4 @@
-"""Relecture des enregistrements (contrat I3, consommateur de I4 playback).
+"""Relecture des enregistrements (contrat I3 de l'app ; source : lab-media/API.md §1.3).
 
 Trois points d'entrée :
 
@@ -8,14 +8,16 @@ Trois points d'entrée :
     (une balise ``<video src>`` ne peut pas porter de Bearer).
 
 Le « clipping au plus tardif des since » est fait ici, côté serveur : la liste
-découpe chaque plage MediaMTX aux frontières d'heure pleine UTC **et** à chaque
+découpe chaque plage rendue par lab-media aux frontières d'heure pleine UTC **et** à chaque
 ``since`` des droits, de sorte que chaque morceau ait un ensemble de pistes
 constant (``tracks_at`` évalué à son début). Le ticket puis le flux ré-appliquent
 ``tracks_at`` : rien n'est délégué au frontend.
 
 Les pistes non autorisées sont retirées par remux ``ffmpeg -c copy`` (jamais de
-ré-encodage — 2 vCPU). ffmpeg lit le fMP4 sur **stdin** : l'URL de playback
-porte les identifiants internes et ne doit jamais apparaître dans ``ps``.
+ré-encodage — 2 vCPU). ffmpeg lit le fMP4 sur **stdin** : c'est le backend qui
+parle à lab-media (identifiants de contrôle en en-tête), jamais ffmpeg.
+lab-media rend toujours TOUTES les pistes : c'est ici, et seulement ici, qu'une
+piste non autorisée est retirée.
 """
 from __future__ import annotations
 
@@ -54,7 +56,7 @@ def _av_path(slug: str) -> str:
 
 
 def _parse_mtx_start(value) -> datetime:
-    """Horodatage de MediaMTX ``/list`` : RFC 3339, parfois à la nanoseconde,
+    """Horodatage d'une plage (lab-media le reprend de MediaMTX) : RFC 3339, parfois à la nanoseconde,
     que ``fromisoformat`` refuse au-delà de la microseconde."""
     if isinstance(value, str):
         value = _FRACTION.sub(r'\1', value)

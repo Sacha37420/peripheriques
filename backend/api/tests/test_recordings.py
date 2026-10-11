@@ -1,7 +1,7 @@
 """Relecture (I3) : liste clippée aux since, ticket signé, flux re-vérifié.
 
-MediaMTX playback (I4) est simulé (patch de `api.media_client.playback_list` /
-`playback_get`). Le remux, lui, est exécuté **en réel** :
+La relecture de lab-media est simulée (patch de `api.media_client.playback_list` /
+`playback_get` ; le client réel est exercé dans `test_lab_media.py`). Le remux, lui, est exécuté **en réel** :
 un vrai fMP4 H.264 + Opus est généré par ffmpeg puis passé dans la vue, et la
 sortie est inspectée par ffprobe.
 

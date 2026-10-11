@@ -1,14 +1,16 @@
-"""Coupure des lectures en direct après révocation d'un droit (I4 v2).
+"""Coupure des lectures en direct après révocation d'un droit.
 
 Synchrone dans la requête PATCH/DELETE (pas de Celery, contrat §7) et
-best-effort : un MediaMTX injoignable est loggé, la révocation en base est déjà
-acquise et n'est jamais annulée.
+best-effort : un lab-media injoignable est loggé, la révocation en base est déjà
+acquise et n'est jamais annulée. Tant que lab-media est injoignable, aucune
+NOUVELLE lecture n'est possible ; un lecteur déjà ouvert, lui, ne peut pas être
+coupé avant son retour (lab-media/README.md, « Cycle de vie »).
 
-L'endpoint de kick dépend du `protocol` enregistré par le hook : `webrtc` →
-webrtcsessions, `hls` → hlssessions. HLS DOIT être coupé explicitement : sur
-MediaMTX 1.21.1 le hook n'est appelé qu'à l'ouverture d'une session HLS, la
-suite est servie sur secret de session (amendement media-01). Tout autre
-protocole (rtsp…) n'a pas d'API de kick : rien à couper.
+L'expulsion passe par l'API de contrôle de lab-media (lab-media/API.md §1.2),
+selon le `protocol` enregistré par le hook : `webrtc` ou `hls`. HLS DOIT être
+coupé explicitement : le hook n'est appelé qu'à l'ouverture d'une session HLS,
+la suite est servie sur secret de session. Tout autre protocole n'est pas
+expulsé par l'app.
 """
 from __future__ import annotations
 
@@ -33,14 +35,14 @@ def kick_revoked(email: str, device_slug: str) -> int:
     courants n'autorisent plus. Renvoie le nombre de sessions coupées."""
     rows = list(MediaSession.objects.filter(
         email=email.lower(), path__startswith=f'{device_slug}/',
-        protocol__in=media_client.SESSION_ENDPOINTS,
+        protocol__in=media_client.SESSION_PROTOCOLS,
     ))
     if not rows:
         return 0
 
     rights = rights_for(email, device_slug)
     kicked = 0
-    for protocol in media_client.SESSION_ENDPOINTS:
+    for protocol in media_client.SESSION_PROTOCOLS:
         mine = [r for r in rows if r.protocol == protocol]
         if not mine:
             continue

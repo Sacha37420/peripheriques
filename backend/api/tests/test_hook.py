@@ -1,4 +1,4 @@
-"""Hook d'autorisation MediaMTX (I2) — règles 1 à 5, cas négatifs compris."""
+"""Hook de lecture (lab-media/API.md §2) : clé, puis `read` seulement, cas négatifs compris."""
 import json
 from datetime import timedelta
 from unittest import mock
@@ -18,9 +18,10 @@ URL = '/api/media-auth/'
 class HookTests(TestCase):
     def call(self, body, key=KEY, method='post'):
         url = URL if key is None else f'{URL}?key={key}'
+        # Corps de MediaMTX tel que lab-media le relaie (API.md §2), `userAgent` compris.
         payload = {'user': '', 'password': '', 'token': '', 'ip': '203.0.113.9',
                    'action': 'read', 'path': 'webcam/av', 'protocol': 'webrtc',
-                   'id': 'sess-1', 'query': ''}
+                   'id': 'sess-1', 'query': '', 'userAgent': 'Mozilla/5.0'}
         payload.update(body)
         return getattr(self.client, method)(url, data=json.dumps(payload),
                                             content_type='application/json')
@@ -58,38 +59,38 @@ class HookTests(TestCase):
         r = self.client.post(f'{URL}?key={KEY}', data=b'[1]', content_type='application/json')
         self.assertEqual(r.status_code, 401)
 
-    # ── Règle 2 : publish ─────────────────────────────────────────────────────
-    def test_publish(self):
-        ok = {'action': 'publish', 'user': 'publisher', 'password': 'pub-secret'}
-        for kind in ('video', 'audio', 'av'):
-            self.assertEqual(self.call({**ok, 'path': f'webcam/{kind}'}).status_code, 200)
-        self.assertEqual(self.call({**ok, 'password': 'nope'}).status_code, 401)
-        self.assertEqual(self.call({**ok, 'user': 'backend', 'password': 'int-secret'}).status_code, 401)
-        self.assertEqual(self.call({**ok, 'path': 'webcam/other'}).status_code, 401)
-        self.assertEqual(self.call({**ok, 'path': 'unknown/av'}).status_code, 401)
-        self.assertEqual(self.call({**ok, 'path': 'webcam/av/x'}).status_code, 401)
-        # un JWT, même admin, ne permet pas de publier
-        self.assertEqual(self.call({'action': 'publish', 'token': admin_token()}).status_code, 401)
+    # ── Tout ce qui n'est pas `read` est refusé ───────────────────────────────
+    # Avant lab-media, ce hook autorisait aussi la publication (ffmpeg) et les
+    # actions internes (API, relecture) de MediaMTX. lab-media-auth les tranche
+    # désormais lui-même : cet endpoint ne doit plus pouvoir les autoriser, même
+    # avec les identifiants qui les ouvraient.
+    def test_publish_refused_even_with_former_credentials(self):
+        self.grant(ADMIN, video=True, audio=True)
+        with self.settings(MEDIA_PUBLISH_USER='publisher', MEDIA_PUBLISH_PASSWORD='pub-secret'):
+            for kind in ('video', 'audio', 'av'):
+                for creds in ({'user': 'publisher', 'password': 'pub-secret'},
+                              {'user': 'backend', 'password': 'int-secret'},
+                              {'token': admin_token()}, {}):
+                    r = self.call({'action': 'publish', 'path': f'webcam/{kind}', **creds})
+                    self.assertEqual((r.status_code, r.content), (401, b''), (kind, creds))
 
-    # ── Règle 3 : actions internes ────────────────────────────────────────────
-    def test_internal_actions(self):
+    def test_internal_actions_refused_even_with_control_credentials(self):
+        self.grant(ADMIN, video=True, audio=True)
         for action in ('playback', 'api', 'metrics', 'pprof'):
-            ok = self.call({'action': action, 'user': 'backend', 'password': 'int-secret', 'path': ''})
-            self.assertEqual(ok.status_code, 200, action)
-            bad = self.call({'action': action, 'user': 'backend', 'password': 'x'})
-            self.assertEqual(bad.status_code, 401, action)
-            pub = self.call({'action': action, 'user': 'publisher', 'password': 'pub-secret'})
-            self.assertEqual(pub.status_code, 401, action)
-            # action `api` avec un JWT utilisateur (même admin) → refus
-            jwt_user = self.call({'action': action, 'token': admin_token()})
-            self.assertEqual(jwt_user.status_code, 401, action)
+            for creds in ({'user': 'backend', 'password': 'int-secret'},     # identifiants de contrôle
+                          {'user': 'publisher', 'password': 'pub-secret'},
+                          {'token': admin_token()}):
+                for path in ('', 'webcam/av'):
+                    r = self.call({'action': action, 'path': path, **creds})
+                    self.assertEqual((r.status_code, r.content), (401, b''), (action, creds))
+        self.assertFalse(MediaSession.objects.exists())
 
-    def test_internal_creds_empty_config_never_match(self):
-        with self.settings(MEDIA_INTERNAL_USER='', MEDIA_INTERNAL_PASSWORD=''):
-            r = self.call({'action': 'api', 'user': '', 'password': ''})
-            self.assertEqual(r.status_code, 401)
+    def test_control_credentials_do_not_read(self):
+        # Les identifiants de contrôle ne sont pas un jeton : aucune lecture avec eux.
+        r = self.call({'user': 'backend', 'password': 'int-secret', 'token': 'int-secret'})
+        self.assertEqual(r.status_code, 401)
 
-    # ── Règle 4 : read ────────────────────────────────────────────────────────
+    # ── read ──────────────────────────────────────────────────────────────────
     def test_read_admin_without_grant_refused(self):
         # v3 : être admin ne donne aucun droit de lecture.
         for kind in ('video', 'audio', 'av'):
@@ -178,9 +179,9 @@ class HookTests(TestCase):
         self.call({'token': admin_token(), 'id': 'new'})
         self.assertEqual(set(MediaSession.objects.values_list('id', flat=True)), {'new'})
 
-    # ── Règle 5 ───────────────────────────────────────────────────────────────
     def test_other_actions_refused(self):
-        for action in ('', 'write', None, 'READ'):
+        self.grant(ADMIN, video=True, audio=True)
+        for action in ('', 'write', None, 'READ', 'read ', ['read']):
             r = self.call({'action': action, 'token': admin_token(),
                            'user': 'backend', 'password': 'int-secret'})
             self.assertEqual(r.status_code, 401, action)

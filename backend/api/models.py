@@ -2,7 +2,7 @@ from django.db import models
 
 
 class Device(models.Model):
-    """Périphérique de l'hôte publié par MediaMTX sous `<slug>/{video,audio,av}` (I1)."""
+    """Périphérique de l'hôte publié par lab-media sous `<slug>/{video,audio,av}` (I1)."""
 
     slug = models.SlugField(primary_key=True, max_length=50)
     label = models.CharField(max_length=100)
@@ -45,12 +45,12 @@ class Grant(models.Model):
 
 
 class MediaSession(models.Model):
-    """Lecture en direct autorisée par le hook (I2 §4), gardée pour pouvoir la
-    couper (kick, I4) quand le droit correspondant est retiré.
+    """Lecture en direct autorisée par le hook, gardée pour pouvoir
+    l'expulser (lab-media/API.md §1.2) quand le droit correspondant est retiré.
 
-    Purge : une ligne disparaît quand son kick réussit, quand une révocation la
-    trouve absente de `/v3/{webrtc,hls}sessions/list` (session déjà terminée), ou au
-    bout de `SESSION_RETENTION` (filet de sécurité, cf. api.hook).
+    Purge : une ligne disparaît quand son expulsion réussit, quand une révocation
+    la trouve absente des sessions listées par lab-media (session déjà terminée),
+    ou au bout de `SESSION_RETENTION` (filet de sécurité, cf. api.hook).
     """
 
     id = models.CharField(primary_key=True, max_length=100)

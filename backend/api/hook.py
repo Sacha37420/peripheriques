@@ -1,12 +1,20 @@
-"""Hook d'autorisation MediaMTX (contrat I2) — `authMethod: http`.
+"""Hook de lecture de l'app (lab-media/API.md §2).
 
-MediaMTX POSTe ici, pour CHAQUE publication / lecture / appel API / playback,
-le JSON {user, password, token, ip, action, path, protocol, id, query}.
-200 = autorisé, 401 = refusé, corps toujours vide.
+lab-media relaie ici CHAQUE demande de lecture d'un chemin `webcam/*` : le JSON
+de MediaMTX {ip, user, password, token, action, path, protocol, id, query,
+userAgent}, tel quel. 200 = autorisé, toute autre réponse = refusé ; le corps
+est toujours vide.
 
-L'URL est routée publiquement par Caddy (/peripheriques-api/api/media-auth/) :
-sans `?key=` correcte, rien ne doit distinguer cet endpoint d'un refus banal —
-même code, même corps vide, quelle que soit la méthode ou le contenu.
+Seule l'action `read` existe encore de ce côté : la publication, l'API, la
+relecture et les métriques de MediaMTX sont tranchées par lab-media-auth et ne
+parviennent plus à l'app. Toute autre action est donc REFUSÉE ici, y compris
+avec les anciens identifiants de publication ou internes — cet endpoint ne doit
+plus jamais pouvoir autoriser autre chose qu'une lecture.
+
+L'URL est routée publiquement par Caddy (/peripheriques-api/api/media-auth/) et
+joignable par toute app de dev-net : sans `?key=` correcte, rien ne doit
+distinguer cet endpoint d'un refus banal — même code, même corps vide, quelle
+que soit la méthode ou le contenu.
 """
 from __future__ import annotations
 
@@ -30,21 +38,12 @@ log = logging.getLogger('api.hook')
 # Filet de sécurité de purge de la table des sessions (cf. MediaSession).
 SESSION_RETENTION = timedelta(days=30)
 
-INTERNAL_ACTIONS = {'playback', 'api', 'metrics', 'pprof'}
-
 
 def _eq(given, expected: str) -> bool:
     """Comparaison en temps constant ; un attendu vide ne valide jamais rien."""
     if not expected or not isinstance(given, str):
         return False
     return hmac.compare_digest(given.encode(), expected.encode())
-
-
-def _creds(body: dict, user: str, password: str) -> bool:
-    # Pas de court-circuit : les deux comparaisons sont toujours faites.
-    ok_user = _eq(body.get('user'), user)
-    ok_pass = _eq(body.get('password'), password)
-    return ok_user and ok_pass
 
 
 def _allow() -> HttpResponse:
@@ -69,29 +68,13 @@ def media_auth(request):
     if not isinstance(body, dict):
         return _deny()
 
-    action = body.get('action')
-    parsed = parse_path(body.get('path') or '')
-
-    # 2. Publication : ffmpeg seul, sur un chemin I1 d'un périphérique connu.
-    if action == 'publish':
-        if not _creds(body, settings.MEDIA_PUBLISH_USER, settings.MEDIA_PUBLISH_PASSWORD):
-            return _deny()
-        if parsed is None or not Device.objects.filter(slug=parsed[0]).exists():
-            return _deny()
-        return _allow()
-
-    # 3. API / playback / métriques : le backend seul, jamais un navigateur.
-    if action in INTERNAL_ACTIONS:
-        if _creds(body, settings.MEDIA_INTERNAL_USER, settings.MEDIA_INTERNAL_PASSWORD):
-            return _allow()
+    # 2. Lecture seulement. Toute autre action (publish, api, playback, metrics,
+    #    pprof, inconnue) est refusée : elle n'a plus rien à faire ici.
+    if body.get('action') != 'read':
         return _deny()
 
-    # 4. Lecture en direct : JWT validé exactement comme l'API REST.
-    if action == 'read':
-        return _read(body, parsed)
-
-    # 5. Tout le reste.
-    return _deny()
+    # 3. JWT validé exactement comme l'API REST, puis droit sur le chemin.
+    return _read(body, parse_path(body.get('path') or ''))
 
 
 def _read(body: dict, parsed) -> HttpResponse:
@@ -121,7 +104,7 @@ def _read(body: dict, parsed) -> HttpResponse:
 
 
 def _remember(session_id: str, user, path: str, protocol: str) -> None:
-    """Garde la session pour pouvoir la couper à la révocation (I4). Best-effort :
+    """Garde la session pour pouvoir l'expulser à la révocation. Best-effort :
     un échec d'écriture ne doit pas refuser une lecture légitime."""
     try:
         MediaSession.objects.update_or_create(

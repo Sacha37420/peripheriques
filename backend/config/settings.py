@@ -172,25 +172,27 @@ TEMPLATES = [
     },
 ]
 
-# ── Périphériques / MediaMTX (contrat chantiers/peripheriques, I2–I5) ─────────
+# ── Périphériques / lab-media ──────────────────────────────────────────────────
 TIME_ZONE = 'UTC'
 # Fuseau dans lequel s'entend le paramètre ?date= de /api/recordings/ (I3).
 RECORDINGS_TZ = 'Europe/Paris'
 
-# Groupes donnant l'accès total (droits, direct, historique) sans Grant.
+# Groupes qui GÈRENT les droits (contrat v3 : aucun accès implicite aux flux).
 PERIPHERIQUES_ADMIN_GROUPS = config('PERIPHERIQUES_ADMIN_GROUPS', default='developers')
 
-# ffmpeg → MediaMTX (publication des chemins I1).
-MEDIA_PUBLISH_USER = config('MEDIA_PUBLISH_USER', default='')
-MEDIA_PUBLISH_PASSWORD = config('MEDIA_PUBLISH_PASSWORD', default='')
-# backend → MediaMTX (API 9997 / playback 9996), et seuls identifiants acceptés
-# par le hook pour les actions playback/api/metrics/pprof.
+# Brique lab-media (lab-media/API.md). Le backend ne parle plus à MediaMTX.
+#  · MEDIA_API_URL : API de contrôle de lab-media-auth (dev-net). État des
+#    chemins, sessions, expulsion ET relecture : une seule base.
+#  · MEDIA_INTERNAL_USER / _PASSWORD : identifiants de CONTRÔLE de l'app auprès de
+#    lab-media (= LAB_MEDIA_APP_PERIPHERIQUES_CONTROL_USER / _PASSWORD dans
+#    lab-media/.env). Ils ne donnent accès qu'aux chemins `webcam/*`.
+#  · MEDIA_HOOK_KEY : clé que lab-media présente à notre hook de lecture
+#    /api/media-auth/?key=… (= LAB_MEDIA_APP_PERIPHERIQUES_HOOK_KEY). Vide ⇒ le
+#    hook refuse tout.
+MEDIA_API_URL = config('MEDIA_API_URL', default='http://lab-media-auth:9100')
 MEDIA_INTERNAL_USER = config('MEDIA_INTERNAL_USER', default='')
 MEDIA_INTERNAL_PASSWORD = config('MEDIA_INTERNAL_PASSWORD', default='')
-# Secret partagé MediaMTX → /api/media-auth/?key=… Vide ⇒ le hook refuse tout.
 MEDIA_HOOK_KEY = config('MEDIA_HOOK_KEY', default='')
-MEDIA_API_URL = config('MEDIA_API_URL', default='http://peripheriques-media:9997')
-MEDIA_PLAYBACK_URL = config('MEDIA_PLAYBACK_URL', default='http://peripheriques-media:9996')
 
 # Compte de service peripheriques-admin (view-users/query-users) : vérifie
 # qu'un email existe dans le realm avant d'accorder un droit.

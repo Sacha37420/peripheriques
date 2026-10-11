@@ -1,0 +1,57 @@
+version: "3.9"
+
+# peripheriques APRÈS la bascule vers la brique lab-media (chantiers/lab-media, phase C).
+#
+# Ce fichier remplace docker-compose.yml à la bascule (procédure : rapport de la phase B,
+# chantiers/lab-media/rapports/peripheriques.md) :
+#     cp docker-compose.lab-media.yml docker-compose.yml
+# Retour arrière : git checkout docker-compose.yml
+#
+# Ce qui disparaît par rapport à l'ancien compose, et pourquoi :
+#   · le service `media` (MediaMTX + ffmpeg) : la capture, la diffusion et l'enregistrement
+#     sont à lab-media/ ; l'app ne garde que la décision d'accès (hook de lecture) ;
+#   · le volume peripheriques-recordings, y compris son montage en lecture seule dans le
+#     backend : la relecture passe par l'API de contrôle de lab-media (lab-media/API.md §1.3),
+#     aucun code du backend ne lit /recordings ;
+#   · le port ICE 8189, les montages /dev et /dev/snd, device_cgroup_rules, group_add.
+# L'app redevient une app ordinaire : aucun périphérique, aucun montage hors de son dossier.
+
+networks:
+  sso-net:
+    external: true
+    name: sso-lab_sso-net
+  dev-net:
+    external: true
+    name: dev-net
+
+services:
+
+  backend:
+    build: ./backend
+    container_name: peripheriques-backend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8101:8000"
+    networks:
+      - sso-net     # Keycloak (clés du realm, compte de service), Caddy
+      - dev-net     # PostgreSQL ; lab-media-auth (API de contrôle, et c'est par ce réseau
+                    # que lab-media-auth appelle le hook de lecture /api/media-auth/)
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.handle_path: "/peripheriques-api/*"
+      caddy.handle_path.reverse_proxy: "{{upstreams 8000}}"
+
+  frontend:
+    build: ./frontend
+    container_name: peripheriques-frontend
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "4216:80"
+    networks:
+      - sso-net
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.handle_path: "/peripheriques/*"
+      caddy.handle_path.reverse_proxy: "{{upstreams 80}}"
