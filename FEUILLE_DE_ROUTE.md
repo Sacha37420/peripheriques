@@ -11,7 +11,7 @@ python manage.py test --settings=config.settings_test
 Les tests tournent sur SQLite en mémoire avec des réglages figés (`config/settings_test.py`).
 Sans `--settings`, ils prennent le `.env` de service et échouent sur les identifiants de lab-media.
 
-## Lot 1 — Toutes les webcams, noms d'affichage et enregistrement par webcam   ·   statut : en cours
+## Lot 1 — Toutes les webcams, noms d'affichage et enregistrement par webcam   ·   statut : livré
 **Objectif :** toute webcam branchée une fois sur l'hôte apparaît sans action humaine dans l'app
 (page « Périphériques » des administrateurs des droits et page « Droits »), sous un nom
 d'affichage modifiable, avec son interrupteur d'enregistrement ; direct et relecture par webcam.
@@ -34,7 +34,7 @@ Chantier `chantiers/webcams` (contrat v1, interfaces I0, I1, I2 servies par lab-
 - [x] `npm run build`
 - [ ] Après mise en service : la HD USB Camera (`usb-32e4-9230-p3-4`) apparaît, se renomme, se
   lit en direct avec un droit Vidéo ; un membre non admin reçoit 403 sur `/api/admin/devices/`
-**Vérifié le :** 2026-10-17 — `essai.sh peripheriques` (PostgreSQL jetable) : 163 tests OK, dont
+**Vérifié le :** 2026-10-17 — `essai.sh peripheriques` (PostgreSQL jetable) : 163 tests OK, dont **Mis en service le 2026-10-17** (après lab-media) : image construite pendant que l'ancienne tournait, `scripts/app-test.sh peripheriques` vert, migrations 0003 à 0006 jouées, les deux droits gardés sur « Ancienne webcam ». En navigateur réel (`e2e_member`) : les deux HD USB Camera détectées sous « HD USB Camera » et « HD USB Camera 2 », renommage vers un nom pris refusé (400), renommage libre accepté, droit Micro absent et refusé (400) sur une webcam sans micro, droit Vidéo accordé puis lecture autorisée par le hook (WebRTC et HLS), enregistrement activé → segment écrit, puis coupé. Image du direct non vue : le Chromium du runner ne décode pas le H.264.
 ceux de `api.tests.test_webcams` (faux lab-media rejouant les réponses I1 du contrat, noms uniques,
 courses simulées) ; migrations 0003/0004 jouées sur PostgreSQL jetable (avant/arrière/avant :
 droits et `since` identiques) ; 0005/0006 sur PostgreSQL jetable : deux « HD USB Camera » →
