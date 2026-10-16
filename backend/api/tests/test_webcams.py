@@ -480,6 +480,8 @@ class MigrationTests(TransactionTestCase):
     def test_webcam_becomes_webcam_ancienne_with_its_grants(self):
         apps = self.migrate(self.before)
         Device, Grant = apps.get_model('api', 'Device'), apps.get_model('api', 'Grant')
+        # Semée par 0002 sur une base neuve ; recréée si un test transactionnel précédent a vidé la base.
+        Device.objects.update_or_create(slug='webcam', defaults={'label': 'Webcam (vidéo + micro)'})
         self.assertEqual(list(Device.objects.values_list('slug', flat=True)), ['webcam'])
         t1, t2 = utc(2026, 10, 10, 9, 0, 1), utc(2026, 10, 12, 18, 30)
         Grant.objects.create(email='sacha@ssolab.local', device_id='webcam', video=True, audio=True,
@@ -504,3 +506,116 @@ class MigrationTests(TransactionTestCase):
         apps = self.migrate(self.before)                 # retour arrière : même état qu'avant
         Grant = apps.get_model('api', 'Grant')
         self.assertEqual(sorted(Grant.objects.values_list('device_id', flat=True)), ['webcam', 'webcam'])
+
+
+# ── Noms d'affichage uniques (à la casse et aux espaces de bord près) ─────────
+
+CAM2 = 'usb-32e4-9230-p3-9'                    # seconde HD USB Camera identique, sans série
+
+
+def seen_at(item, when):
+    item['first_seen'] = when
+    return item
+
+
+class UniqueLabelTests(WebcamCase):
+    def labels(self):
+        return {d['id']: d['label'] for d in self.admin_list().json()['items']}
+
+    def test_two_identical_cameras_get_distinct_names(self):
+        # Rendue en premier par I1 mais branchée après : l'ordre vient de first_seen.
+        self.plug(seen_at(device_item(CAM2, usb_port='3-9'), '2026-10-17T08:00:00+02:00'),
+                  seen_at(device_item(CAM), '2026-10-17T07:00:00+02:00'))
+        labels = self.labels()
+        self.assertEqual((labels[CAM], labels[CAM2]), ('HD USB Camera', 'HD USB Camera 2'))
+        third = 'usb-32e4-9230-p1-1'
+        self.plug(seen_at(device_item(third, usb_port='1-1'), '2026-10-17T09:00:00+02:00'))
+        inventory.invalidate()
+        labels = self.labels()
+        self.assertEqual(labels[third], 'HD USB Camera 3')
+        self.assertEqual((labels[CAM], labels[CAM2]), ('HD USB Camera', 'HD USB Camera 2'))
+
+    def test_same_first_seen_ordered_by_id(self):
+        self.plug(device_item(CAM2, usb_port='3-9'), device_item(CAM))   # même first_seen
+        labels = self.labels()
+        self.assertEqual((labels[CAM], labels[CAM2]), ('HD USB Camera', 'HD USB Camera 2'))
+
+    def test_case_and_edge_spaces_count_as_taken(self):
+        # Même first_seen : l'identifiant départage (usb-046d… avant usb-32e4…).
+        self.plug(device_item(CAM), device_item(MIC_CAM, model='  hd usb CAMERA '))
+        labels = self.labels()
+        self.assertEqual((labels[MIC_CAM], labels[CAM]), ('hd usb CAMERA', 'HD USB Camera 2'))
+
+    def test_ancienne_webcam_is_a_taken_name(self):
+        self.plug(device_item(CAM, model='Ancienne webcam'))
+        labels = self.labels()
+        self.assertEqual((labels['webcam-ancienne'], labels[CAM]), ('Ancienne webcam', 'Ancienne webcam 2'))
+
+    def test_long_model_keeps_suffix_within_limit(self):
+        self.plug(device_item(CAM, model='M' * 100), device_item(CAM2, model='M' * 100))
+        label = self.labels()[CAM2]
+        self.assertEqual((len(label), label[-2:]), (100, ' 2'))
+
+    def test_race_between_processes_ends_numbered_not_500(self):
+        # Le contrôle préalable « ne voit » pas le nom pris (autre processus) : c'est la
+        # contrainte de la base qui tranche, et l'inventaire passe au numéro suivant.
+        self.plug(device_item(CAM), device_item(CAM2, usb_port='3-9'))
+        with mock.patch.object(Device, 'label_taken', return_value=False):
+            r = self.admin_list()
+        self.assertEqual(r.status_code, 200)
+        labels = {d['id']: d['label'] for d in r.json()['items']}
+        self.assertEqual((labels[CAM], labels[CAM2]), ('HD USB Camera', 'HD USB Camera 2'))
+
+    def test_database_refuses_duplicate(self):
+        from django.db import IntegrityError, transaction
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Device.objects.create(slug=CAM, label='  ANCIENNE webcam')
+
+    def test_rename_to_taken_name_refused(self):
+        self.plug(device_item(CAM), device_item(CAM2, usb_port='3-9'))
+        self.admin_list()
+        for taken in ('HD USB Camera', 'hd usb camera', '  HD USB CAMERA ', 'ancienne WEBCAM'):
+            r = self.patch_device(CAM2, {'label': taken})
+            self.assertEqual(r.status_code, 400, taken)
+            self.assertEqual(r.json(), {'label': ['Ce nom est déjà porté par un autre périphérique : '
+                                                  'choisissez-en un autre.']})
+        self.assertEqual(Device.objects.get(slug=CAM).label, 'HD USB Camera')     # le premier garde son nom
+        self.assertEqual(Device.objects.get(slug=CAM2).label, 'HD USB Camera 2')
+        # Changer la casse de son propre nom reste permis ; un nom libre aussi.
+        self.assertEqual(self.patch_device(CAM, {'label': 'HD USB CAMERA'}).status_code, 200)
+        self.assertEqual(self.patch_device(CAM2, {'label': 'Cuisine'}).json()['label'], 'Cuisine')
+
+    def test_rename_race_400_not_500(self):
+        self.plug(device_item(CAM), device_item(CAM2, usb_port='3-9'))
+        self.admin_list()
+        with mock.patch.object(Device, 'label_taken', return_value=False):
+            r = self.patch_device(CAM2, {'label': 'hd usb camera'})
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(Device.objects.get(slug=CAM2).label, 'HD USB Camera 2')
+
+
+class LabelMigrationTests(TransactionTestCase):
+    def migrate(self, target):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(target)
+        return executor.loader.project_state(target).apps
+
+    def tearDown(self):
+        self.migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+    def test_duplicates_made_unique_before_constraint(self):
+        apps = self.migrate([('api', '0004_webcam_ancienne')])
+        Device = apps.get_model('api', 'Device')
+        Device.objects.update_or_create(slug='webcam-ancienne', defaults={'label': 'Ancienne webcam'})
+        Device.objects.create(slug=CAM2, label='HD USB Camera', first_seen=utc(2026, 10, 17, 8))
+        Device.objects.create(slug=CAM, label=' hd usb camera ', first_seen=utc(2026, 10, 17, 7))
+        Device.objects.create(slug=MIC_CAM, label='ancienne webcam', first_seen=utc(2026, 10, 17, 9))
+        apps = self.migrate([('api', '0006_device_label_unique_ci')])
+        Device = apps.get_model('api', 'Device')
+        self.assertEqual(dict(Device.objects.values_list('slug', 'label')), {
+            CAM: 'hd usb camera',              # premier branché : nom gardé (bords retirés)
+            CAM2: 'HD USB Camera 2',
+            'webcam-ancienne': 'Ancienne webcam',   # sans first_seen : la plus ancienne
+            MIC_CAM: 'ancienne webcam 2',
+        })

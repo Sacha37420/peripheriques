@@ -4,7 +4,7 @@ import logging
 from django.conf import settings
 from django.http import HttpResponse
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, F
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -179,6 +179,7 @@ class MaterielView(APIView):
 
 LABEL_MAX = 60
 LABEL_ERROR = "Nom d'affichage : de 1 à 60 caractères, sur une seule ligne."
+LABEL_TAKEN = "Ce nom est déjà porté par un autre périphérique : choisissez-en un autre."
 MEDIA_DOWN = 'Serveur média indisponible.'
 MEDIA_ODD = 'Réponse inattendue du serveur média.'
 
@@ -256,6 +257,8 @@ class AdminDeviceView(APIView):
                     or not 1 <= len(label.strip()) <= LABEL_MAX:
                 return Response({'label': [LABEL_ERROR]}, status=400)
             label = label.strip()
+            if Device.label_taken(label, exclude=device.slug):
+                return Response({'label': [LABEL_TAKEN]}, status=400)
         if 'record' in body and not isinstance(body['record'], bool):
             return Response({'record': ['Vrai ou faux attendu.']}, status=400)
 
@@ -277,8 +280,17 @@ class AdminDeviceView(APIView):
             device.record = item.get('record') is True
             inventory.invalidate()
         if label is not None:
-            device.label = label
-        device.save()
+            previous, device.label = device.label, label
+            try:
+                with transaction.atomic():
+                    device.save()
+            except IntegrityError:
+                # Course : un autre processus vient de donner ce nom (contrainte d'unicité).
+                device.label = previous
+                device.save()
+                return Response({'label': [LABEL_TAKEN]}, status=400)
+        else:
+            device.save()
         return Response(admin_device(device))
 
     def delete(self, request, slug):

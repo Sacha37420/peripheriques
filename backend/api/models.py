@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models.functions import Lower, Trim
 
 
 class Device(models.Model):
@@ -40,9 +41,25 @@ class Device(models.Model):
     class Meta:
         db_table = 'devices'
         ordering = ['slug']
+        constraints = [
+            # Deux périphériques ne portent jamais le même nom d'affichage, à la casse et aux
+            # espaces de bord près (garantie en base : une course finit en IntegrityError,
+            # que l'inventaire et le renommage savent traiter).
+            models.UniqueConstraint(Lower(Trim('label')), name='device_label_unique_ci'),
+        ]
 
     def __str__(self) -> str:
         return self.slug
+
+    @classmethod
+    def label_taken(cls, label: str, exclude: str | None = None) -> bool:
+        """Nom déjà porté par un autre périphérique — même comparaison que la contrainte
+        (`lower(trim(label))`, faite par la base)."""
+        qs = cls.objects.annotate(_key=Lower(Trim('label'))).filter(
+            _key=Lower(Trim(models.Value(label))))
+        if exclude is not None:
+            qs = qs.exclude(slug=exclude)
+        return qs.exists()
 
     def paths(self) -> dict[str, str | None]:
         """Chemins connus, par kind ; None si absent (pas de micro)."""

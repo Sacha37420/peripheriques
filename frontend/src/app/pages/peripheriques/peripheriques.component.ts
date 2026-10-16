@@ -92,6 +92,11 @@ export class PeripheriquesComponent implements OnInit {
     const v = this.draft(d).trim();
     if (!v) return 'Le nom ne peut pas être vide.';
     if (v.length > LABEL_MAX) return `${LABEL_MAX} caractères au plus.`;
+    // Confort : l'API refuse de toute façon (400) un nom déjà porté, casse comprise.
+    const key = v.toLowerCase();
+    if (this.devices().some(o => o.id !== d.id && o.label.trim().toLowerCase() === key)) {
+      return 'Ce nom est déjà porté par un autre périphérique.';
+    }
     return '';
   }
 

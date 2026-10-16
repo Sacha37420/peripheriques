@@ -25,13 +25,18 @@ Chantier `chantiers/webcams` (contrat v1, interfaces I0, I1, I2 servies par lab-
 - [x] Droit Micro refusé (400) et non proposé pour une webcam sans micro
 - [x] Migrations 0003/0004 : `webcam` → `webcam-ancienne`, droits et `since` gardés
 - [x] Frontend : page « Périphériques », page « Droits » (vidéo seule), direct par chemin I1
+- [x] Noms d'affichage uniques (casse et espaces de bord ignorés) : à l'arrivée « Modèle 2 »,
+  « Modèle 3 »… (ordre `first_seen` puis identifiant) ; renommage vers un nom pris refusé (400) ;
+  index unique `lower(trim(label))` (migrations 0005 dédoublonnage, 0006 contrainte)
 - [ ] Mise en service et essai sur la vraie caméra, une fois lab-media livré (architecte)
 **Tests à passer avant de clore le lot :**
 - [x] `python manage.py test --settings=config.settings_test` (dont `api.tests.test_webcams`)
 - [x] `npm run build`
 - [ ] Après mise en service : la HD USB Camera (`usb-32e4-9230-p3-4`) apparaît, se renomme, se
   lit en direct avec un droit Vidéo ; un membre non admin reçoit 403 sur `/api/admin/devices/`
-**Vérifié le :** 2026-10-17 — `essai.sh peripheriques` (PostgreSQL jetable) : 153 tests OK, dont
-31 du lot (faux lab-media rejouant les réponses I1 du contrat) ; migrations 0003/0004 jouées sur
-PostgreSQL jetable (avant/arrière/avant : droits et `since` identiques) ; `makemigrations --check`
+**Vérifié le :** 2026-10-17 — `essai.sh peripheriques` (PostgreSQL jetable) : 163 tests OK, dont
+ceux de `api.tests.test_webcams` (faux lab-media rejouant les réponses I1 du contrat, noms uniques,
+courses simulées) ; migrations 0003/0004 jouées sur PostgreSQL jetable (avant/arrière/avant :
+droits et `since` identiques) ; 0005/0006 sur PostgreSQL jetable : deux « HD USB Camera » →
+« hd usb camera » et « HD USB Camera 2 », doublon refusé par l'index (IntegrityError) ; `makemigrations --check`
 sans écart ; `npm run build` vert. Non vérifié : navigateur réel, lab-media réel (pas encore livré).

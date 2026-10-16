@@ -5,7 +5,9 @@
       <p class="subtitle">
         Toutes les webcams déjà branchées sur l’hôte, branchées ou non. Une webcam nouvellement
         branchée apparaît ici et dans la page Droits sans rien faire ; elle n’enregistre pas tant
-        que son interrupteur n’est pas activé. Le nom d’affichage est propre à cette application.
+        que son interrupteur n’est pas activé. Le nom d’affichage est propre à cette application et
+        ne peut pas être celui d’un autre périphérique : deux webcams identiques arrivent sous
+        « Modèle » et « Modèle 2 ».
       </p>
     </div>
     <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">Actualiser</button>

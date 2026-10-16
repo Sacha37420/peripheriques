@@ -7,6 +7,9 @@ Jamais dans le hook de lecture : il ne décide que sur la base, sans appel sorta
 Règles :
   * un périphérique rendu par I1 est créé à la première lecture, nom d'affichage = `model`
     (texte brut, jamais interprété) ; ce nom n'est ensuite plus jamais réécrit ici ;
+  * les noms sont uniques (casse et espaces de bord ignorés, contrainte en base) : si `model`
+    est déjà pris, le nouveau reçoit « model 2 », « model 3 »… dans l'ordre `first_seen` puis
+    identifiant (le premier arrivé garde le nom nu) ;
   * tout le reste (modèle, port, micro, état, chemins…) suit I1 à chaque synchronisation ;
   * lab-media injoignable ou réponse illisible : rien n'est modifié, les périphériques déjà
     connus restent utilisables, l'état « inventaire injoignable » est exposé aux admins ;
@@ -22,10 +25,10 @@ import logging
 import re
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -146,15 +149,55 @@ def _parse(item) -> dict | None:
     }
 
 
+def numbered(base: str, n: int, limit: int = 100) -> str:
+    """« base » pour n = 1, « base 2 », « base 3 »… ; la base est raccourcie si besoin."""
+    if n <= 1:
+        return base[:limit]
+    suffix = f' {n}'
+    return base[:limit - len(suffix)].rstrip() + suffix
+
+
+MAX_NUMBER = 1000
+
+
+def _create(slug: str, base: str, fields: dict) -> bool:
+    """Crée le périphérique sous le premier nom libre : « base », puis « base 2 », « base 3 »…
+
+    Le contrôle préalable évite presque toutes les collisions ; la contrainte d'unicité de la
+    base tranche les courses entre processus : une IntegrityError fait essayer le numéro
+    suivant (dans un point de reprise), jamais une erreur 500. Renvoie False si un autre
+    processus a créé le même périphérique entre-temps."""
+    for n in range(1, MAX_NUMBER + 1):
+        label = numbered(base, n)
+        if Device.label_taken(label):
+            continue
+        try:
+            with transaction.atomic():
+                Device.objects.create(slug=slug, label=label, **fields)
+            return True
+        except IntegrityError:
+            if Device.objects.filter(slug=slug).exists():
+                return False
+    raise RuntimeError(f'aucun nom libre pour {slug}')
+
+
 def apply(items) -> None:
-    """Applique une liste I1 lue avec succès (voir les règles en tête de module)."""
+    """Applique une liste I1 lue avec succès (voir les règles en tête de module).
+
+    Ordre de traitement déterministe — `first_seen` puis identifiant — pour que le premier
+    arrivé garde le nom nu et que deux synchronisations concurrentes numérotent pareil."""
+    parsed = []
+    for item in items if isinstance(items, list) else []:
+        fields = _parse(item)
+        if fields is None:
+            log.warning('Inventaire : entrée ignorée (forme inattendue)')
+            continue
+        parsed.append(fields)
+    early = datetime.min.replace(tzinfo=dt_timezone.utc)   # jamais daté = le plus ancien (héritée)
+    parsed.sort(key=lambda f: (f['first_seen'] or early, f['slug']))
     seen: set[str] = set()
     with transaction.atomic():
-        for item in items if isinstance(items, list) else []:
-            fields = _parse(item)
-            if fields is None:
-                log.warning('Inventaire : entrée ignorée (forme inattendue)')
-                continue
+        for fields in parsed:
             slug = fields.pop('slug')
             if slug in seen:
                 continue
@@ -169,10 +212,11 @@ def apply(items) -> None:
             seen.add(slug)
             device = Device.objects.filter(slug=slug).first()
             if device is None:
-                label = LEGACY_LABEL if slug == LEGACY_ID else (fields['model'] or slug)
-                Device.objects.create(slug=slug, label=label, **fields)
-                log.info('Inventaire : nouveau périphérique %s', slug)
-                continue
+                base = LEGACY_LABEL if slug == LEGACY_ID else (fields['model'] or slug)
+                if _create(slug, base, fields):
+                    log.info('Inventaire : nouveau périphérique %s', slug)
+                    continue
+                device = Device.objects.get(slug=slug)
             changed = [k for k, v in fields.items() if getattr(device, k) != v]
             if changed:
                 for k in changed:
