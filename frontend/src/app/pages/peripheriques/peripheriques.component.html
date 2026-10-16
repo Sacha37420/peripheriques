@@ -1,0 +1,123 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1>Périphériques</h1>
+      <p class="subtitle">
+        Toutes les webcams déjà branchées sur l’hôte, branchées ou non. Une webcam nouvellement
+        branchée apparaît ici et dans la page Droits sans rien faire ; elle n’enregistre pas tant
+        que son interrupteur n’est pas activé. Le nom d’affichage est propre à cette application.
+      </p>
+    </div>
+    <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">Actualiser</button>
+  </header>
+
+  @if (inventory()?.reachable === false) {
+    <div class="card warn" role="status" data-test="inventory-down">
+      <p>
+        Le serveur média ne répond pas : la liste montre le dernier état connu
+        @if (inventory()?.checked_at) { (vérifié le {{ fmt(inventory()!.checked_at) }}) }.
+      </p>
+    </div>
+  }
+
+  @if (loading()) {
+    <p class="loading-msg">Chargement des périphériques…</p>
+  } @else if (loadErrors().length) {
+    <div class="card" role="alert">
+      @for (msg of loadErrors(); track $index) { <p class="error-msg">{{ msg }}</p> }
+    </div>
+  } @else if (!devices().length) {
+    <div class="card"><p class="empty-msg">Aucun périphérique vu pour l’instant.</p></div>
+  } @else {
+    <div class="grid">
+      @for (d of devices(); track d.id) {
+        <article class="card device" data-test="device" [attr.data-id]="d.id"
+                 [class.busy]="isBusy(d.id)" [attr.aria-busy]="isBusy(d.id)">
+          <header class="device-head">
+            <h2>{{ d.label }}</h2>
+            <span [class]="'badge ' + stateClass[d.state]" data-test="device-state">
+              {{ stateLabel[d.state] }}
+            </span>
+            @if (d.record) { <span class="badge badge-red">Enregistre</span> }
+          </header>
+
+          @if (d.state === 'error' && d.error_detail) {
+            <p class="error-msg" data-test="device-error">{{ d.error_detail }}</p>
+          }
+          @if (!d.listed) {
+            <p class="note">Absent de la dernière liste du serveur média.</p>
+          }
+
+          <dl class="facts">
+            <dt>Modèle</dt><dd>{{ d.model || '—' }}</dd>
+            <dt>Identifiant</dt><dd class="mono">{{ d.id }}</dd>
+            <dt>Port USB</dt><dd class="mono">{{ d.usb_port || '—' }}</dd>
+            @if (d.vendor_id) {
+              <dt>USB</dt><dd class="mono">{{ d.vendor_id }}:{{ d.product_id }}</dd>
+            }
+            <dt>Micro</dt><dd>{{ d.has_audio ? 'oui' : 'non (vidéo seule)' }}</dd>
+            <dt>Premier branchement</dt><dd>{{ fmt(d.first_seen) }}</dd>
+            <dt>Dernier branchement</dt><dd>{{ d.connected ? 'branché' : fmt(d.last_seen) }}</dd>
+            <dt>Droits accordés</dt><dd>{{ d.grants }}</dd>
+          </dl>
+
+          <form class="rename" (submit)="rename(d, $event)" data-test="rename-form">
+            <div class="form-group">
+              <label [attr.for]="'label-' + d.id">Nom d’affichage</label>
+              <input [id]="'label-' + d.id" type="text" name="label" autocomplete="off"
+                     data-test="rename-input" [attr.maxlength]="labelMax"
+                     [value]="draft(d)" [disabled]="isBusy(d.id)"
+                     (input)="setDraft(d.id, $any($event.target).value)" />
+            </div>
+            <button type="submit" class="btn btn-primary" data-test="rename-submit"
+                    [disabled]="!canRename(d)">Renommer</button>
+          </form>
+          @if (draft(d).trim() !== d.label && draftError(d)) {
+            <p class="error-msg">{{ draftError(d) }}</p>
+          }
+
+          <div class="actions">
+            @if (d.state === 'legacy') {
+              <span class="note">L’ancienne webcam n’enregistre plus ; ses enregistrements restent
+                consultables jusqu’à leur expiration.</span>
+            } @else {
+              <label class="check" data-test="record-toggle">
+                <input type="checkbox" [checked]="d.record" [disabled]="isBusy(d.id)"
+                       (change)="toggleRecord(d, $event)" />
+                Enregistrer
+              </label>
+            }
+            @if (!d.connected && confirming() !== d.id) {
+              <button type="button" class="btn btn-danger" data-test="forget"
+                      [disabled]="isBusy(d.id)" (click)="askForget(d)">Oublier</button>
+            }
+          </div>
+
+          @if (confirming() === d.id) {
+            <div class="confirm-box" data-test="forget-confirm-box">
+              <span>
+                Oublier « {{ d.label }} » ?
+                @if (d.grants) { Ses {{ d.grants }} droit(s) seront supprimés. }
+                Ses enregistrements ne seront plus consultables ici.
+                S’il est rebranché, il réapparaîtra comme un nouveau périphérique.
+              </span>
+              <button type="button" class="btn btn-danger" data-test="forget-confirm"
+                      [disabled]="isBusy(d.id)" (click)="forget(d)">Confirmer</button>
+              <button type="button" class="btn btn-ghost" data-test="forget-cancel"
+                      [disabled]="isBusy(d.id)" (click)="cancelForget()">Annuler</button>
+            </div>
+          }
+
+          @if (errors()[d.id]; as msgs) {
+            <div class="msgs" role="alert" data-test="device-errors">
+              @for (msg of msgs; track $index) { <p class="error-msg">{{ msg }}</p> }
+            </div>
+          }
+          @if (notices()[d.id]; as msg) {
+            <p class="success-msg" role="status">{{ msg }}</p>
+          }
+        </article>
+      }
+    </div>
+  }
+</section>

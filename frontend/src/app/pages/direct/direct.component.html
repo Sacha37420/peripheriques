@@ -27,6 +27,7 @@
               <span class="badge badge-gray">Hors ligne</span>
             }
             @if (item.kind) { <span class="badge badge-blue">{{ kindLabel[item.kind] }}</span> }
+            @if (!item.device.has_audio) { <span class="badge badge-gray">Sans micro</span> }
           </header>
 
           @if (!item.kind) {
@@ -36,8 +37,10 @@
               Le périphérique est hors ligne : pas de direct pour le moment.
               Les <a routerLink="/enregistrements">enregistrements</a> déjà réalisés restent consultables.
             </p>
+          } @else if (item.path) {
+            <app-live-player [path]="item.path" [kind]="item.kind" />
           } @else {
-            <app-live-player [slug]="item.device.slug" [kind]="item.kind" />
+            <p class="offline">Le direct de ce périphérique n’est pas disponible.</p>
           }
         </article>
       }

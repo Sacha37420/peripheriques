@@ -19,6 +19,12 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/grants/grants.component').then(m => m.GrantsComponent),
   },
   {
+    path: 'peripheriques',
+    title: 'Périphériques — Périphériques',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./pages/peripheriques/peripheriques.component').then(m => m.PeripheriquesComponent),
+  },
+  {
     path: 'materiel',
     title: 'Matériel conseillé — Périphériques',
     canActivate: [adminGuard],

@@ -14,20 +14,83 @@ export interface Capability {
   since: string | null;
 }
 
+/**
+ * Chemins de lecture d'un périphérique, tels que lab-media les donne (contrat webcams, I1).
+ * Toujours utilisés tels quels, jamais recomposés. `audio` est null sans micro.
+ */
+export interface StreamPaths {
+  av: string | null;
+  video: string | null;
+  audio: string | null;
+}
+
 export interface Device {
+  /** Identifiant I0 (ex. « usb-32e4-9230-p3-4 », « webcam-ancienne »). */
   slug: string;
+  /** Nom d'affichage — texte brut, toujours rendu par interpolation. */
   label: string;
   online: boolean;
+  has_audio: boolean;
+  paths: StreamPaths;
   video: Capability;
   audio: Capability;
 }
 
-/** GET /api/grants/devices/ (admin, v4) : tous les périphériques, pour la gestion des droits uniquement. */
+/** État d'inventaire (I1) ; '' = état inconnu. */
+export type DeviceState = 'live' | 'waiting' | 'starting' | 'error' | 'offline' | 'legacy' | '';
+
+/** GET /api/grants/devices/ (admin) : tous les périphériques, pour la gestion des droits uniquement. */
 export interface GrantDevice {
   slug: string;
   label: string;
   online: boolean;
+  has_audio: boolean;
+  state: DeviceState;
+  connected: boolean;
 }
+
+/** GET /api/admin/devices/ (admins des droits) : un périphérique déjà vu, branché ou non. */
+export interface AdminDevice {
+  id: string;
+  label: string;
+  model: string;
+  vendor_id: string;
+  product_id: string;
+  serial: string;
+  usb_port: string;
+  has_audio: boolean;
+  connected: boolean;
+  state: DeviceState;
+  error_detail: string;
+  record: boolean;
+  first_seen: string | null;
+  last_seen: string | null;
+  paths: StreamPaths;
+  /** Faux : absent de la dernière liste lue chez lab-media. */
+  listed: boolean;
+  grants: number;
+}
+
+export interface AdminDeviceList {
+  inventory: { reachable: boolean | null; checked_at: string | null };
+  items: AdminDevice[];
+}
+
+export interface AdminDevicePatch {
+  label?: string;
+  record?: boolean;
+}
+
+/** Libellés français des états d'inventaire. */
+export const STATE_LABEL: Record<DeviceState, string> = {
+  live: 'En direct',
+  waiting: 'En attente (plafond de capture atteint)',
+  starting: 'Démarrage',
+  error: 'En erreur',
+  offline: 'Débranché',
+  legacy: 'Ancienne webcam',
+  '': 'État inconnu',
+};
 
 export interface Grant {
   id: number;
@@ -79,9 +142,9 @@ export type StreamKind = 'av' | 'video' | 'audio';
 
 /** av si vidéo+audio, video ou audio sinon, null si aucun droit (I6). */
 export function streamKind(d: Device): StreamKind | null {
-  if (d.video.allowed && d.audio.allowed) return 'av';
+  if (d.video.allowed && d.audio.allowed && d.paths.audio) return 'av';
   if (d.video.allowed) return 'video';
-  if (d.audio.allowed) return 'audio';
+  if (d.audio.allowed && d.paths.audio) return 'audio';
   return null;
 }
 

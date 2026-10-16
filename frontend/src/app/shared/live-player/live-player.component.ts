@@ -66,7 +66,8 @@ const TOKEN_REFRESH_MS = 30000;
   `],
 })
 export class LivePlayerComponent implements AfterViewInit, OnDestroy {
-  @Input({ required: true }) slug!: string;
+  /** Chemin MediaMTX donné par l'inventaire (I1), jamais recomposé. */
+  @Input({ required: true }) path!: string;
   @Input({ required: true }) kind!: StreamKind;
 
   @ViewChild('media') private mediaRef?: ElementRef<HTMLMediaElement>;
@@ -178,7 +179,7 @@ export class LivePlayerComponent implements AfterViewInit, OnDestroy {
     await pc.setLocalDescription(await pc.createOffer());
     await this.iceGatheringDone(pc);
 
-    const res = await fetch(this.api.whepUrl(this.slug, this.kind), {
+    const res = await fetch(this.api.whepUrl(this.path), {
       method: 'POST',
       headers: { 'Content-Type': 'application/sdp', Authorization: await this.bearer() },
       body: pc.localDescription!.sdp,
@@ -266,7 +267,7 @@ export class LivePlayerComponent implements AfterViewInit, OnDestroy {
         }
         reject(err);
       });
-      hls.loadSource(this.api.hlsUrl(this.slug, this.kind));
+      hls.loadSource(this.api.hlsUrl(this.path));
       hls.attachMedia(el);
     });
     if (gen !== this.generation) return;

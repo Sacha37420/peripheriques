@@ -8,6 +8,8 @@ import { NoAccessComponent } from '../../shared/no-access/no-access.component';
 interface DirectItem {
   device: Device;
   kind: StreamKind | null;
+  /** Chemin à lire, pris tel quel dans l'inventaire (I1) ; null s'il n'existe pas. */
+  path: string | null;
 }
 
 const KIND_LABEL: Record<StreamKind, string> = {
@@ -40,7 +42,10 @@ export class DirectComponent implements OnInit {
     this.errors.set([]);
     this.api.getDevices().subscribe({
       next: devices => {
-        this.items.set(devices.map(device => ({ device, kind: streamKind(device) })));
+        this.items.set(devices.map(device => {
+          const kind = streamKind(device);
+          return { device, kind, path: kind ? device.paths[kind] : null };
+        }));
         this.loading.set(false);
       },
       error: err => {

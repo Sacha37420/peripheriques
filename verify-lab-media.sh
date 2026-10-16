@@ -210,7 +210,7 @@ from django.db import connection
 from api.models import Device
 c = connection.cursor(); c.execute(\"select table_schema from information_schema.tables where table_name = 'grants'\")
 print(connection.settings_dict['HOST'], connection.settings_dict['NAME'], c.fetchall()[0][0], list(Device.objects.values_list('slug', flat=True)))" | tail -1)"
-[[ "$r" == "lmt-db devdb peripheriques ['webcam']" ]]; expect F2 "backend de test sur la base jetable (migrations jouées, périphérique webcam semé)" "$r"
+[[ "$r" == "lmt-db devdb peripheriques ['webcam-ancienne']" ]]; expect F2 "backend de test sur la base jetable (migrations jouées, ancienne webcam migrée)" "$r"
 
 # ── 3. Sans droit ────────────────────────────────────────────────────────────
 note "Compte sans Grant"
@@ -225,7 +225,7 @@ SINCE="$(manage "
 from api.access import iso, now_s
 from api.models import Grant
 n = now_s()
-Grant.objects.create(email='e2edev@ssolab.local', device_id='webcam', video=True, audio=True, video_since=n, audio_since=n, granted_by='verify@ssolab.local')
+Grant.objects.create(email='e2edev@ssolab.local', device_id='webcam-ancienne', video=True, audio=True, video_since=n, audio_since=n, granted_by='verify@ssolab.local')
 print(iso(n))" | tail -1)"
 docker exec lmt-client sh -c "printf '{\"since\": \"%s\"}' '$SINCE' > /tmp/lmt-state.json"
 docker run -d --name lmt-src --network lmt-sso -v "$RUN/src.yml:/mediamtx.yml:ro" "$MTX_IMG" >/dev/null

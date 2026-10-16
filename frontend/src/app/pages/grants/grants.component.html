@@ -24,9 +24,9 @@
       <div class="form-group">
         <label for="grant-device">Périphérique</label>
         <select id="grant-device" name="device" data-test="grant-device"
-                (change)="device.set($any($event.target).value)">
+                (change)="selectDevice($any($event.target).value)">
           @for (d of devices(); track d.slug) {
-            <option [value]="d.slug" [selected]="d.slug === device()">{{ d.label }}</option>
+            <option [value]="d.slug" [selected]="d.slug === device()">{{ d.label }}{{ d.has_audio ? '' : ' (vidéo seule)' }}</option>
           }
         </select>
       </div>
@@ -37,11 +37,15 @@
                [checked]="video()" (change)="video.set($any($event.target).checked)" />
         Vidéo
       </label>
-      <label class="check">
-        <input type="checkbox" name="audio" data-test="grant-audio"
-               [checked]="audio()" (change)="audio.set($any($event.target).checked)" />
-        Micro
-      </label>
+      @if (selectedHasMic()) {
+        <label class="check">
+          <input type="checkbox" name="audio" data-test="grant-audio"
+                 [checked]="audio()" (change)="audio.set($any($event.target).checked)" />
+          Micro
+        </label>
+      } @else {
+        <span class="no-mic" data-test="grant-no-mic">Sans micro : vidéo seule</span>
+      }
       <button type="submit" class="btn btn-primary" data-test="grant-submit" [disabled]="submitting()">
         Accorder
       </button>
@@ -96,10 +100,14 @@
                 </label>
               </td>
               <td>
-                <label class="check" [attr.aria-label]="'Micro — ' + g.email">
-                  <input type="checkbox" data-test="row-audio" [checked]="g.audio"
-                         [disabled]="isBusy(g.id)" (change)="toggle(g, 'audio', $event)" />
-                </label>
+                @if (hasMic(g.device) || g.audio) {
+                  <label class="check" [attr.aria-label]="'Micro — ' + g.email">
+                    <input type="checkbox" data-test="row-audio" [checked]="g.audio"
+                           [disabled]="isBusy(g.id)" (change)="toggle(g, 'audio', $event)" />
+                  </label>
+                } @else {
+                  <span class="no-mic" title="Ce périphérique n’a pas de micro">—</span>
+                }
               </td>
               <td class="since">
                 <span>Vidéo : {{ since(g.video_since) }}</span>

@@ -23,6 +23,11 @@ export class GrantsComponent implements OnInit {
   private readonly deviceLabels = computed(
     () => new Map(this.devices().map(d => [d.slug, d.label] as const)),
   );
+  private readonly deviceMics = computed(
+    () => new Map(this.devices().map(d => [d.slug, d.has_audio] as const)),
+  );
+  /** Le périphérique choisi dans le formulaire a-t-il un micro ? (sinon : vidéo seule) */
+  readonly selectedHasMic = computed(() => this.hasMic(this.device()));
 
   // ── État par ligne ──
   readonly busy = signal<ReadonlySet<number>>(new Set());
@@ -49,7 +54,8 @@ export class GrantsComponent implements OnInit {
       next: ({ grants, devices }) => {
         this.grants.set(grants);
         this.devices.set(devices);
-        if (!this.device() && devices.length) this.device.set(devices[0].slug);
+        if (!devices.some(d => d.slug === this.device())) this.device.set(devices[0]?.slug ?? '');
+        if (!this.selectedHasMic()) this.audio.set(false);
         this.rowErrors.set({});
         this.confirming.set(null);
         this.loading.set(false);
@@ -63,6 +69,16 @@ export class GrantsComponent implements OnInit {
 
   deviceLabel(slug: string): string {
     return this.deviceLabels().get(slug) ?? slug;
+  }
+
+  /** Inconnu ⇒ vrai : l'API reste juge (400 sur un droit Micro impossible). */
+  hasMic(slug: string): boolean {
+    return this.deviceMics().get(slug) ?? true;
+  }
+
+  selectDevice(slug: string): void {
+    this.device.set(slug);
+    if (!this.hasMic(slug)) this.audio.set(false);
   }
 
   since(iso: string | null): string {
@@ -88,7 +104,7 @@ export class GrantsComponent implements OnInit {
       email: this.email().trim(),
       device: this.device(),
       video: this.video(),
-      audio: this.audio(),
+      audio: this.audio() && this.selectedHasMic(),
     }).subscribe({
       next: g => {
         this.upsert(g);

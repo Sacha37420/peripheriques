@@ -85,3 +85,11 @@ tr.sub .msgs { margin-top: 0; }
 }
 
 .grant-note { color: var(--text-mute); font-size: var(--text-sm); margin-top: var(--space-3); }
+
+.no-mic {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-mute);
+  font-size: var(--text-sm);
+}

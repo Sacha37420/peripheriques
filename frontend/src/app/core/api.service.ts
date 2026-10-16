@@ -2,11 +2,17 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
-  Device, Grant, GrantCreate, GrantDevice, Materiel, GrantPatch, Me, Segment, Ticket, TicketRequest, StreamKind,
+  AdminDevice, AdminDeviceList, AdminDevicePatch, Device, Grant, GrantCreate, GrantDevice, Materiel,
+  GrantPatch, Me, Segment, Ticket, TicketRequest,
 } from './models';
 
 interface EnvWindow {
   __env?: { apiUrl?: string };
+}
+
+/** Encode chaque segment d'un chemin MediaMTX sans toucher aux « / » qui les séparent. */
+function encodePath(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/');
 }
 
 /** Client de l'API I3 (CONTRAT v1) + construction des URLs média I6. */
@@ -59,6 +65,21 @@ export class ApiService {
     return this.http.get<Materiel>(`${this.base}/api/admin/materiel/`);
   }
 
+  /** Admins des droits : tous les périphériques déjà vus (inventaire de lab-media). */
+  getAdminDevices(): Observable<AdminDeviceList> {
+    return this.http.get<AdminDeviceList>(`${this.base}/api/admin/devices/`);
+  }
+
+  /** Renommer (label) et/ou interrupteur d'enregistrement (record, relayé à lab-media). */
+  updateAdminDevice(id: string, body: AdminDevicePatch): Observable<AdminDevice> {
+    return this.http.patch<AdminDevice>(`${this.base}/api/admin/devices/${encodeURIComponent(id)}/`, body);
+  }
+
+  /** Oublier un périphérique débranché : ses droits sont supprimés avec lui. */
+  forgetAdminDevice(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/api/admin/devices/${encodeURIComponent(id)}/`);
+  }
+
   /** date = YYYY-MM-DD, journée Europe/Paris. */
   getRecordings(device: string, date: string): Observable<Segment[]> {
     const params = new HttpParams().set('device', device).set('date', date);
@@ -76,11 +97,12 @@ export class ApiService {
 
   // ── URLs navigateur de la brique lab-media (même origine que l'API, via Caddy) ──
   // lab-media/API.md §3 : /lab-media-webrtc/<chemin>/whep et /lab-media-hls/<chemin>/index.m3u8.
-  whepUrl(slug: string, kind: StreamKind): string {
-    return `${this.origin}/lab-media-webrtc/${encodeURIComponent(slug)}/${kind}/whep`;
+  // <chemin> est celui que donne l'inventaire (I1), tel quel : seuls ses segments sont encodés.
+  whepUrl(path: string): string {
+    return `${this.origin}/lab-media-webrtc/${encodePath(path)}/whep`;
   }
 
-  hlsUrl(slug: string, kind: StreamKind): string {
-    return `${this.origin}/lab-media-hls/${encodeURIComponent(slug)}/${kind}/index.m3u8`;
+  hlsUrl(path: string): string {
+    return `${this.origin}/lab-media-hls/${encodePath(path)}/index.m3u8`;
   }
 }
