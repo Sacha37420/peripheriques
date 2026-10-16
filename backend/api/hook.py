@@ -29,7 +29,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.exceptions import AuthenticationFailed
 
-from .access import kind_allowed, parse_path, rights_for
+from .access import kind_allowed, rights_for
 from .authentication import validate_token
 from .models import Device, MediaSession
 
@@ -73,14 +73,17 @@ def media_auth(request):
     if body.get('action') != 'read':
         return _deny()
 
-    # 3. JWT validé exactement comme l'API REST, puis droit sur le chemin.
-    return _read(body, parse_path(body.get('path') or ''))
+    # 3. Périphérique retrouvé par ses chemins connus (I2), puis JWT validé
+    #    exactement comme l'API REST, puis droit sur ce chemin.
+    return _read(body, body.get('path'))
 
 
-def _read(body: dict, parsed) -> HttpResponse:
-    if parsed is None:
+def _read(body: dict, path) -> HttpResponse:
+    if isinstance(path, str) and path.startswith('/'):
+        path = path[1:]
+    device, kind = Device.by_path(path)
+    if device is None:
         return _deny()
-    slug, kind = parsed
     token = body.get('token') or ''
     if not isinstance(token, str):
         return _deny()
@@ -91,15 +94,12 @@ def _read(body: dict, parsed) -> HttpResponse:
     except AuthenticationFailed:
         return _deny()
 
-    device = Device.objects.filter(slug=slug).first()
-    if device is None:
-        return _deny()
     if not kind_allowed(rights_for(user.email, device), kind):
         return _deny()
 
     session_id = body.get('id')
     if isinstance(session_id, str) and session_id:
-        _remember(session_id, user, f'{slug}/{kind}', body.get('protocol') or '')
+        _remember(session_id, user, path, body.get('protocol') or '')
     return _allow()
 
 

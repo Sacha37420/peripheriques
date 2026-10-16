@@ -10,6 +10,9 @@ qu'aux chemins de l'app :
     POST /v1/sessions/<protocol>/<id>/kick        expulsion d'un lecteur
     GET  /v1/recordings?path=<chemin>             plages enregistrées
     GET  /v1/recordings/get?path=&start=&duration=&format=fmp4    une plage, en flux
+    GET    /v1/devices                            inventaire des périphériques (webcams, I1)
+    PATCH  /v1/devices/<id>  {"record": bool}     interrupteur d'enregistrement
+    DELETE /v1/devices/<id>                       oubli d'un périphérique débranché
 
 Brique injoignable, réponse inattendue ou identifiants refusés : `MediaError`
 (ou `False` pour `path_ready`). Aucune de ces pannes n'ouvre quoi que ce soit —
@@ -41,6 +44,16 @@ class MediaError(RuntimeError):
 class MediaAuthError(MediaError):
     """lab-media a refusé nos identifiants de contrôle (401) : erreur de
     configuration (MEDIA_INTERNAL_USER/PASSWORD ≠ lab-media/.env), pas une panne."""
+
+
+class DeviceRefused(MediaError):
+    """lab-media a refusé une action sur un périphérique (I1) : `status` HTTP
+    (404, 409, 400) et `code` (`legacy`, `connected`, …) tels qu'il les rend."""
+
+    def __init__(self, status: int, code: str):
+        super().__init__(f'périphérique refusé : HTTP {status} {code}')
+        self.status = status
+        self.code = code
 
 
 def _auth() -> tuple[str, str]:
@@ -127,3 +140,54 @@ def playback_get(path: str, start_iso: str, duration_s: float) -> requests.Respo
         resp.close()
         raise MediaError(f'lecture d\'une plage → HTTP {resp.status_code}')
     return resp
+
+
+# ── Inventaire des périphériques (contrat webcams v1, I1) ─────────────────────
+
+def _error_code(resp: requests.Response) -> str:
+    try:
+        body = resp.json()
+    except ValueError:
+        return ''
+    return str(body.get('error') or '') if isinstance(body, dict) else ''
+
+
+def list_devices() -> list[dict]:
+    """Tous les périphériques déjà vus (branchés ou non), tels que lab-media les rend."""
+    resp = _request('GET', '/v1/devices', what='inventaire des périphériques')
+    if resp.status_code != 200:
+        raise MediaError(f'inventaire des périphériques → HTTP {resp.status_code}')
+    try:
+        items = resp.json()
+    except ValueError as exc:
+        raise MediaError('inventaire des périphériques : réponse illisible') from exc
+    if not isinstance(items, list):
+        raise MediaError('inventaire des périphériques : réponse illisible')
+    return items
+
+
+def set_device_record(device_id: str, record: bool) -> dict:
+    """Interrupteur d'enregistrement : rend l'objet à jour ; `DeviceRefused` (400, 404, 409)."""
+    resp = _request('PATCH', f'/v1/devices/{quote(device_id, safe="")}',
+                    what='réglage d\'enregistrement', json={'record': bool(record)})
+    if resp.status_code in (400, 404, 409):
+        raise DeviceRefused(resp.status_code, _error_code(resp))
+    if resp.status_code != 200:
+        raise MediaError(f'réglage d\'enregistrement → HTTP {resp.status_code}')
+    try:
+        item = resp.json()
+    except ValueError as exc:
+        raise MediaError('réglage d\'enregistrement : réponse illisible') from exc
+    if not isinstance(item, dict):
+        raise MediaError('réglage d\'enregistrement : réponse illisible')
+    return item
+
+
+def forget_device(device_id: str) -> None:
+    """Oubli d'un périphérique débranché (204) ; `DeviceRefused` sur 404 ou 409 (`connected`)."""
+    resp = _request('DELETE', f'/v1/devices/{quote(device_id, safe="")}', what='oubli d\'un périphérique')
+    if resp.status_code == 204:
+        return
+    if resp.status_code in (400, 404, 409):
+        raise DeviceRefused(resp.status_code, _error_code(resp))
+    raise MediaError(f'oubli d\'un périphérique → HTTP {resp.status_code}')

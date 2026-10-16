@@ -42,7 +42,7 @@ class FakeBrickCase(TestCase):
 
     def grant(self, email=MEMBER, video_since=None, audio_since=None):
         return Grant.objects.create(
-            email=email, device_id='webcam',
+            email=email, device_id='webcam-ancienne',
             video=video_since is not None, audio=audio_since is not None,
             video_since=video_since, audio_since=audio_since, granted_by=ADMIN)
 
@@ -249,10 +249,10 @@ class RecordingsTests(FakeBrickCase):
         self.fake.recordings['webcam/av'] = [{'start': '2026-10-04T09:30:00.123456789Z', 'duration': 10800.0}]
 
     def list(self, headers):
-        return self.client.get('/api/recordings/', {'device': 'webcam', 'date': '2026-10-04'}, **headers)
+        return self.client.get('/api/recordings/', {'device': 'webcam-ancienne', 'date': '2026-10-04'}, **headers)
 
     def ticket(self, start, duration_s=600):
-        return self.client.post('/api/recordings/ticket/', {'device': 'webcam', 'start': start,
+        return self.client.post('/api/recordings/ticket/', {'device': 'webcam-ancienne', 'start': start,
                                                             'duration_s': duration_s},
                                 content_type='application/json', **self.member)
 

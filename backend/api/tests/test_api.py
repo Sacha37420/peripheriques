@@ -53,10 +53,12 @@ class DeviceTests(TestCase):
 
     def test_admin_with_grant_like_anyone(self, _ready):
         since = timezone.now().replace(microsecond=0)
-        Grant.objects.create(email=ADMIN, device_id='webcam', audio=True, audio_since=since,
+        Grant.objects.create(email=ADMIN, device_id='webcam-ancienne', audio=True, audio_since=since,
                              granted_by=ADMIN)
         self.assertEqual(self.client.get('/api/devices/', **bearer(admin_token())).json(), [{
-            'slug': 'webcam', 'label': 'Webcam (vidéo + micro)', 'online': True,
+            'slug': 'webcam-ancienne', 'label': 'Ancienne webcam', 'online': True,
+            'has_audio': True,
+            'paths': {'av': 'webcam/av', 'video': 'webcam/video', 'audio': 'webcam/audio'},
             'video': {'allowed': False, 'since': None},
             'audio': {'allowed': True, 'since': since.isoformat().replace('+00:00', 'Z')},
         }])
@@ -66,7 +68,7 @@ class DeviceTests(TestCase):
 
     def test_member_with_video_grant(self, _ready):
         since = timezone.now().replace(microsecond=0) - timedelta(hours=1)
-        Grant.objects.create(email=MEMBER, device_id='webcam', video=True, video_since=since,
+        Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, video_since=since,
                              granted_by=ADMIN)
         d = self.client.get('/api/devices/', **bearer(make_token())).json()[0]
         self.assertEqual(d['video'], {'allowed': True,
@@ -75,7 +77,7 @@ class DeviceTests(TestCase):
 
     def test_offline_when_media_unreachable(self, ready):
         ready.return_value = False
-        Grant.objects.create(email=ADMIN, device_id='webcam', video=True,
+        Grant.objects.create(email=ADMIN, device_id='webcam-ancienne', video=True,
                              video_since=timezone.now(), granted_by=ADMIN)
         d = self.client.get('/api/devices/', **bearer(admin_token())).json()[0]
         self.assertFalse(d['online'])
@@ -93,17 +95,17 @@ class GrantTests(TestCase):
                                  **bearer(tok or admin_token()))
 
     def test_non_admin_403_everywhere(self, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, granted_by=ADMIN)
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, granted_by=ADMIN)
         tok = make_token(groups=('famille',))
         self.assertEqual(self.client.get('/api/grants/', **bearer(tok)).status_code, 403)
-        self.assertEqual(self.post({'email': OTHER, 'device': 'webcam', 'video': True}, tok).status_code, 403)
+        self.assertEqual(self.post({'email': OTHER, 'device': 'webcam-ancienne', 'video': True}, tok).status_code, 403)
         self.assertEqual(self.patch(g.id, {'audio': True}, tok).status_code, 403)
         self.assertEqual(self.client.delete(f'/api/grants/{g.id}/', **bearer(tok)).status_code, 403)
         g.refresh_from_db()
         self.assertFalse(g.audio)
 
     def test_create(self, kc):
-        r = self.post({'email': ' Member@SSOLab.local ', 'device': 'webcam', 'video': True})
+        r = self.post({'email': ' Member@SSOLab.local ', 'device': 'webcam-ancienne', 'video': True})
         self.assertEqual(r.status_code, 201, r.content)
         body = r.json()
         self.assertEqual(body['email'], MEMBER)
@@ -111,7 +113,7 @@ class GrantTests(TestCase):
         self.assertTrue(body['video_since'].endswith('Z'))
         self.assertIsNone(body['audio_since'])
         self.assertEqual(body['granted_by'], ADMIN)
-        self.assertEqual(body['device'], 'webcam')
+        self.assertEqual(body['device'], 'webcam-ancienne')
         self.assertEqual(set(body), {'id', 'email', 'device', 'video', 'audio', 'video_since',
                                      'audio_since', 'granted_by', 'updated_at'})
         kc.assert_called_once_with(MEMBER)
@@ -119,23 +121,23 @@ class GrantTests(TestCase):
 
     def test_create_unknown_account(self, kc):
         kc.return_value = None
-        r = self.post({'email': 'ghost@ssolab.local', 'device': 'webcam', 'audio': True})
+        r = self.post({'email': 'ghost@ssolab.local', 'device': 'webcam-ancienne', 'audio': True})
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json(), {'email': ['Aucun compte du lab avec cet email.']})
         self.assertFalse(Grant.objects.exists())
 
     def test_create_keycloak_down_503(self, kc):
         kc.side_effect = keycloak_admin.KeycloakAdminError('down')
-        self.assertEqual(self.post({'email': OTHER, 'device': 'webcam', 'audio': True}).status_code, 503)
+        self.assertEqual(self.post({'email': OTHER, 'device': 'webcam-ancienne', 'audio': True}).status_code, 503)
 
     def test_create_requires_a_right(self, _kc):
-        r = self.post({'email': OTHER, 'device': 'webcam', 'video': False, 'audio': False})
+        r = self.post({'email': OTHER, 'device': 'webcam-ancienne', 'video': False, 'audio': False})
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json(), {'non_field_errors': ['Au moins un droit (vidéo ou micro) est requis.']})
 
     def test_create_duplicate_400(self, _kc):
-        self.assertEqual(self.post({'email': OTHER, 'device': 'webcam', 'video': True}).status_code, 201)
-        r = self.post({'email': OTHER.upper(), 'device': 'webcam', 'audio': True})
+        self.assertEqual(self.post({'email': OTHER, 'device': 'webcam-ancienne', 'video': True}).status_code, 201)
+        r = self.post({'email': OTHER.upper(), 'device': 'webcam-ancienne', 'audio': True})
         self.assertEqual(r.status_code, 400)
         self.assertIn('non_field_errors', r.json())
 
@@ -143,7 +145,7 @@ class GrantTests(TestCase):
         self.assertEqual(self.post({'email': OTHER, 'device': 'nope', 'video': True}).status_code, 400)
 
     def test_put_not_allowed(self, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, granted_by=ADMIN)
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, granted_by=ADMIN)
         r = self.client.put(f'/api/grants/{g.id}/', data={'video': True, 'audio': True},
                             content_type='application/json', **bearer(admin_token()))
         self.assertEqual(r.status_code, 405)
@@ -152,7 +154,7 @@ class GrantTests(TestCase):
     @mock.patch('api.media_client.list_sessions')
     def test_patch_transitions_and_kick(self, live, kick, _kc):
         old = timezone.now().replace(microsecond=0) - timedelta(days=1)
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, video_since=old,
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, video_since=old,
                                  granted_by=ADMIN)
         # true→true conserve since ; false→true pose since
         r = self.patch(g.id, {'video': True, 'audio': True}).json()
@@ -175,7 +177,7 @@ class GrantTests(TestCase):
     @mock.patch('api.media_client.kick_session')
     @mock.patch('api.media_client.list_sessions')
     def test_revocation_during_hls_session_kicks_hls(self, live, kick, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, audio=True,
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, audio=True,
                                  granted_by=ADMIN)
         MediaSession.objects.create(id='h1', email=MEMBER, path='webcam/video', protocol='hls')
         MediaSession.objects.create(id='w1', email=MEMBER, path='webcam/av', protocol='webrtc')
@@ -191,7 +193,7 @@ class GrantTests(TestCase):
     @mock.patch('api.media_client.kick_session')
     @mock.patch('api.media_client.list_sessions')
     def test_other_protocol_never_calls_media(self, live, kick, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, granted_by=ADMIN)
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, granted_by=ADMIN)
         MediaSession.objects.create(id='r1', email=MEMBER, path='webcam/video', protocol='rtsp')
         MediaSession.objects.create(id='x1', email=MEMBER, path='webcam/video', protocol='')
         self.assertEqual(self.client.delete(f'/api/grants/{g.id}/', **bearer(admin_token())).status_code, 204)
@@ -199,14 +201,14 @@ class GrantTests(TestCase):
         kick.assert_not_called()
 
     def test_patch_both_false_400(self, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, granted_by=ADMIN)
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, granted_by=ADMIN)
         self.assertEqual(self.patch(g.id, {'video': False}).status_code, 400)
         self.assertEqual(self.patch(g.id, {'video': False, 'audio': False}).status_code, 400)
         g.refresh_from_db()
         self.assertTrue(g.video)
 
     def test_patch_cannot_change_email_or_device(self, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, granted_by=ADMIN)
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, granted_by=ADMIN)
         self.patch(g.id, {'email': OTHER, 'audio': True})
         g.refresh_from_db()
         self.assertEqual(g.email, MEMBER)
@@ -214,7 +216,7 @@ class GrantTests(TestCase):
     @mock.patch('api.media_client.kick_session')
     @mock.patch('api.media_client.list_sessions')
     def test_delete_kicks_all_but_admin_sessions(self, live, kick, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, audio=True,
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, audio=True,
                                  granted_by=ADMIN)
         MediaSession.objects.create(id='s1', email=MEMBER, path='webcam/audio', protocol='webrtc')
         MediaSession.objects.create(id='gone', email=MEMBER, path='webcam/av', protocol='hls')
@@ -231,7 +233,7 @@ class GrantTests(TestCase):
     @mock.patch('api.media_client.list_sessions')
     def test_revoking_admin_own_grant_kicks_admin(self, live, kick, _kc):
         # v3 : un admin dont on révoque le Grant est coupé comme les autres.
-        g = Grant.objects.create(email=ADMIN, device_id='webcam', video=True, audio=True,
+        g = Grant.objects.create(email=ADMIN, device_id='webcam-ancienne', video=True, audio=True,
                                  video_since=timezone.now(), audio_since=timezone.now(),
                                  granted_by=ADMIN)
         MediaSession.objects.create(id='a-av', email=ADMIN, path='webcam/av', protocol='webrtc')
@@ -244,7 +246,7 @@ class GrantTests(TestCase):
 
     @mock.patch('api.media_client.list_sessions', side_effect=Exception('media down'))
     def test_revocation_survives_kick_failure(self, _live, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, audio=True,
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, audio=True,
                                  granted_by=ADMIN)
         MediaSession.objects.create(id='s1', email=MEMBER, path='webcam/av', protocol='hls')
         with self.assertLogs('api.kick', 'WARNING'):
@@ -259,7 +261,7 @@ class GrantTests(TestCase):
     @mock.patch('api.media_client.kick_session', side_effect=Exception('boom'))
     @mock.patch('api.media_client.list_sessions', side_effect=lambda p: [{'id': 's1', 'path': 'webcam/av'}])
     def test_kick_call_failure_logged(self, _live, _kick, _kc):
-        g = Grant.objects.create(email=MEMBER, device_id='webcam', video=True, audio=True,
+        g = Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True, audio=True,
                                  granted_by=ADMIN)
         MediaSession.objects.create(id='s1', email=MEMBER, path='webcam/av', protocol='webrtc')
         with self.assertLogs('api.kick', 'WARNING'):
@@ -275,8 +277,9 @@ class GrantDevicesTests(TestCase):
     def test_admin_without_grant_sees_all_devices(self, ready):
         r = self.client.get('/api/grants/devices/', **bearer(admin_token()))
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json(), [{'slug': 'webcam', 'label': 'Webcam (vidéo + micro)',
-                                     'online': True}])
+        self.assertEqual(r.json(), [{'slug': 'webcam-ancienne', 'label': 'Ancienne webcam',
+                                     'online': True, 'has_audio': True, 'state': 'legacy',
+                                     'connected': False}])
         ready.assert_called_once_with('webcam/av')
         # /api/devices/ reste v3 : rien pour un admin sans Grant
         self.assertEqual(self.client.get('/api/devices/', **bearer(admin_token())).json(), [])
@@ -287,7 +290,7 @@ class GrantDevicesTests(TestCase):
         self.assertFalse(r.json()[0]['online'])
 
     def test_non_admin_403(self, _ready):
-        Grant.objects.create(email=MEMBER, device_id='webcam', video=True,
+        Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True,
                              video_since=timezone.now(), granted_by=ADMIN)
         self.assertEqual(self.client.get('/api/grants/devices/', **bearer(make_token())).status_code, 403)
         tok = make_token(ADMIN, groups=('developers',), azp='admin-cli')
@@ -303,7 +306,7 @@ class GrantDevicesTests(TestCase):
     def test_detail_routes_unaffected(self, _live, _kc, _ready):
         adm = bearer(admin_token())
         self.assertEqual(self.client.get('/api/grants/', **adm).json(), [])
-        g = self.client.post('/api/grants/', data={'email': MEMBER, 'device': 'webcam', 'video': True},
+        g = self.client.post('/api/grants/', data={'email': MEMBER, 'device': 'webcam-ancienne', 'video': True},
                              content_type='application/json', **adm).json()
         url = f"/api/grants/{g['id']}/"
         self.assertEqual(self.client.get(url, **adm).json()['email'], MEMBER)

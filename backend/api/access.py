@@ -3,7 +3,8 @@ la relecture (I3) et la décision de kick (I4).
 
 Vocabulaire :
   capacité (cap) : 'video' | 'audio' — ce qu'un Grant accorde ;
-  kind           : 'video' | 'audio' | 'av' — suffixe d'un chemin MediaMTX (I1) ;
+  kind           : 'video' | 'audio' | 'av' — rôle d'un chemin MediaMTX parmi ceux que
+                   I1 donne au périphérique (jamais déduit en découpant le chemin) ;
   since          : instant d'octroi d'une capacité, borne basse de la relecture.
 """
 from __future__ import annotations
@@ -68,14 +69,6 @@ def tracks_at(rights: Rights, instant: datetime) -> list[str]:
         cap for cap in CAPS
         if rights[cap].allowed and rights[cap].since is not None and rights[cap].since <= instant
     ]
-
-
-def parse_path(path: str) -> tuple[str, str] | None:
-    """'webcam/av' (ou '/webcam/av') → ('webcam', 'av') ; None si hors I1."""
-    parts = (path or '').strip('/').split('/')
-    if len(parts) != 2 or parts[1] not in KIND_CAPS or not parts[0]:
-        return None
-    return parts[0], parts[1]
 
 
 # ── Horodatages (convention commune du contrat : ISO 8601 UTC avec `Z`) ──────

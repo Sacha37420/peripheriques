@@ -21,7 +21,7 @@ from django.utils import timezone
 
 from . import media_client
 from .access import kind_allowed, rights_for
-from .models import MediaSession
+from .models import Device, MediaSession
 
 log = logging.getLogger('api.kick')
 
@@ -30,17 +30,36 @@ log = logging.getLogger('api.kick')
 _GRACE = timedelta(minutes=5)
 
 
-def kick_revoked(email: str, device_slug: str) -> int:
-    """Coupe les sessions WebRTC/HLS de `email` sur `device_slug` que ses droits
-    courants n'autorisent plus. Renvoie le nombre de sessions coupées."""
-    rows = list(MediaSession.objects.filter(
-        email=email.lower(), path__startswith=f'{device_slug}/',
-        protocol__in=media_client.SESSION_PROTOCOLS,
-    ))
+def kick_revoked(email: str, device: Device) -> int:
+    """Coupe les sessions WebRTC/HLS de `email` sur `device` que ses droits
+    courants n'autorisent plus. Renvoie le nombre de sessions coupées.
+
+    Les sessions sont retrouvées par les chemins connus du périphérique (I1),
+    jamais par un préfixe : `webcam/av` (ancienne webcam) n'est pas un préfixe
+    sûr de `webcam/<id>/av`."""
+    rights = rights_for(email, device)
+    return _kick(
+        MediaSession.objects.filter(email=email.lower(), path__in=_known_paths(device)),
+        lambda row: not kind_allowed(rights, device.kind_of(row.path) or ''),
+        f'{email}/{device.slug}',
+    )
+
+
+def kick_paths(paths: list[str], what: str) -> int:
+    """Coupe TOUTES les sessions WebRTC/HLS ouvertes sur `paths` (oubli d'un
+    périphérique : plus aucun droit ne tient sur lui)."""
+    return _kick(MediaSession.objects.filter(path__in=[p for p in paths if p]),
+                 lambda row: True, what)
+
+
+def _known_paths(device: Device) -> list[str]:
+    return [p for p in device.paths().values() if p]
+
+
+def _kick(queryset, must_go, what: str) -> int:
+    rows = list(queryset.filter(protocol__in=media_client.SESSION_PROTOCOLS))
     if not rows:
         return 0
-
-    rights = rights_for(email, device_slug)
     kicked = 0
     for protocol in media_client.SESSION_PROTOCOLS:
         mine = [r for r in rows if r.protocol == protocol]
@@ -49,14 +68,14 @@ def kick_revoked(email: str, device_slug: str) -> int:
         try:
             live = {s.get('id') for s in media_client.list_sessions(protocol)}
         except Exception as exc:  # noqa: BLE001
-            log.warning('Kick %s impossible pour %s/%s : %s', protocol, email, device_slug, exc)
+            log.warning('Kick %s impossible pour %s : %s', protocol, what, exc)
             continue
         for row in mine:
             if row.id not in live:
                 if row.created_at < timezone.now() - _GRACE:
                     row.delete()
                 continue
-            if kind_allowed(rights, row.path.split('/', 1)[1]):
+            if not must_go(row):
                 continue
             try:
                 media_client.kick_session(protocol, row.id)
@@ -67,5 +86,5 @@ def kick_revoked(email: str, device_slug: str) -> int:
             row.delete()
             kicked += 1
             log.info('Session %s %s (%s, %s) coupée après révocation',
-                     protocol, row.id, email, row.path)
+                     protocol, row.id, row.email, row.path)
     return kicked

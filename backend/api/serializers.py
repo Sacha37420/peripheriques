@@ -6,6 +6,7 @@ from .models import Device, Grant
 NEED_ONE = 'Au moins un droit (vidéo ou micro) est requis.'
 NEED_ONE_PATCH = 'Au moins un droit (vidéo ou micro) est requis. Pour tout retirer, utiliser DELETE.'
 NO_ACCOUNT = 'Aucun compte du lab avec cet email.'
+NO_MIC = "Ce périphérique n'a pas de micro : seul le droit Vidéo peut être accordé."
 ALREADY = 'Un droit existe déjà pour cet email sur ce périphérique : utiliser PATCH.'
 
 
@@ -44,6 +45,8 @@ class GrantCreateSerializer(GrantSerializer):
     def validate(self, attrs):
         if not (attrs.get('video') or attrs.get('audio')):
             raise serializers.ValidationError({'non_field_errors': [NEED_ONE]})
+        if attrs.get('audio') and not attrs['device'].has_audio:
+            raise serializers.ValidationError({'audio': [NO_MIC]})
         if Grant.objects.filter(email=attrs['email'], device=attrs['device']).exists():
             raise serializers.ValidationError({'non_field_errors': [ALREADY]})
         return attrs
@@ -57,6 +60,8 @@ class GrantUpdateSerializer(serializers.ModelSerializer):
         fields = ['video', 'audio']
 
     def validate(self, attrs):
+        if attrs.get('audio') and not self.instance.device.has_audio:
+            raise serializers.ValidationError({'audio': [NO_MIC]})
         video = attrs.get('video', self.instance.video)
         audio = attrs.get('audio', self.instance.audio)
         if not (video or audio):

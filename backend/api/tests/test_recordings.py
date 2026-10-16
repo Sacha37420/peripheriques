@@ -74,17 +74,17 @@ class RecordingsBase(TestCase):
 
     def grant(self, video_since=None, audio_since=None, email=MEMBER):
         return Grant.objects.create(
-            email=email, device_id='webcam',
+            email=email, device_id='webcam-ancienne',
             video=video_since is not None, audio=audio_since is not None,
             video_since=video_since, audio_since=audio_since, granted_by=ADMIN,
         )
 
-    def list(self, ranges, headers, date='2026-10-04', device='webcam'):
+    def list(self, ranges, headers, date='2026-10-04', device='webcam-ancienne'):
         with mock.patch('api.media_client.playback_list', return_value=ranges) as pl:
             resp = self.client.get(LIST_URL, {'device': device, 'date': date}, **headers)
         return resp, pl
 
-    def ticket(self, headers, start='2026-10-04T11:00:00Z', duration_s=600, device='webcam'):
+    def ticket(self, headers, start='2026-10-04T11:00:00Z', duration_s=600, device='webcam-ancienne'):
         return self.client.post(TICKET_URL, {'device': device, 'start': start,
                                              'duration_s': duration_s},
                                 content_type='application/json', **headers)
@@ -211,7 +211,7 @@ class RecordingListTests(RecordingsBase):
     def test_media_injoignable_503(self):
         self.grant(video_since=utc(2026, 1, 1))
         with mock.patch('api.media_client.playback_list', side_effect=MediaError('x')):
-            resp = self.client.get(LIST_URL, {'device': 'webcam', 'date': '2026-10-04'},
+            resp = self.client.get(LIST_URL, {'device': 'webcam-ancienne', 'date': '2026-10-04'},
                                    **self.member)
         self.assertEqual(resp.status_code, 503)
 
@@ -219,7 +219,7 @@ class RecordingListTests(RecordingsBase):
         # DRF répond 403 (et non 401) : KeycloakJWTAuthentication ne définit pas
         # authenticate_header — comportement commun à toute l'API, hors périmètre ici.
         with mock.patch('api.media_client.playback_list') as pl:
-            resp = self.client.get(LIST_URL, {'device': 'webcam', 'date': '2026-10-04'})
+            resp = self.client.get(LIST_URL, {'device': 'webcam-ancienne', 'date': '2026-10-04'})
         self.assertIn(resp.status_code, (401, 403))
         pl.assert_not_called()
 
@@ -234,7 +234,7 @@ class RecordingTicketTests(RecordingsBase):
         self.assertEqual(body['tracks'], ['video'])
         raw = parse_qs(urlsplit(body['url']).query)['ticket'][0]
         payload = signing.loads(raw, salt=recordings.TICKET_SALT)
-        self.assertEqual(payload, {'email': MEMBER, 'device': 'webcam',
+        self.assertEqual(payload, {'email': MEMBER, 'device': 'webcam-ancienne',
                                    'start': '2026-10-04T11:00:00Z', 'duration': 600,
                                    'tracks': ['video']})
 
@@ -388,7 +388,7 @@ class RecordingStreamTests(RecordingsBase):
         with mock.patch('api.media_client.playback_get') as pg:
             self.assertEqual(self.client.get(STREAM_PATH).status_code, 403)
             self.assertEqual(self.client.get(path[:-3] + 'abc').status_code, 403)
-            forged = signing.dumps({'email': MEMBER, 'device': 'webcam',
+            forged = signing.dumps({'email': MEMBER, 'device': 'webcam-ancienne',
                                     'start': '2026-10-04T11:00:00Z', 'duration': 600,
                                     'tracks': ['video']}, salt='autre-sel')
             self.assertEqual(self.client.get(STREAM_PATH, {'ticket': forged}).status_code, 403)
@@ -430,7 +430,7 @@ class RecordingStreamTests(RecordingsBase):
     def test_ticket_v2_admin_sans_grant_403(self):
         # Un ticket correctement signé au format v2 (« is_admin ») n'ouvre plus rien :
         # seul le Grant courant compte, sans repli Keycloak.
-        raw = signing.dumps({'email': ADMIN, 'device': 'webcam',
+        raw = signing.dumps({'email': ADMIN, 'device': 'webcam-ancienne',
                              'start': '2020-01-01T00:00:00Z', 'duration': 600,
                              'tracks': ['video', 'audio'], 'is_admin': True},
                             salt=recordings.TICKET_SALT)

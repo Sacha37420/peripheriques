@@ -28,7 +28,7 @@ class HookTests(TestCase):
 
     def grant(self, email=MEMBER, video=True, audio=False):
         now = timezone.now()
-        return Grant.objects.create(email=email, device_id='webcam', video=video, audio=audio,
+        return Grant.objects.create(email=email, device_id='webcam-ancienne', video=video, audio=audio,
                                     video_since=now if video else None,
                                     audio_since=now if audio else None,
                                     granted_by=ADMIN)
@@ -165,7 +165,7 @@ class HookTests(TestCase):
 
     def test_hls_session_recorded_with_protocol(self):
         # v2 : le hook n'est appelé qu'à l'ouverture d'une session HLS → il faut la garder pour le kick.
-        Grant.objects.create(email=MEMBER, device_id='webcam', video=True,
+        Grant.objects.create(email=MEMBER, device_id='webcam-ancienne', video=True,
                              video_since=timezone.now(), granted_by=ADMIN)
         r = self.call({'token': make_token(), 'path': 'webcam/video', 'id': 'hls-1', 'protocol': 'hls'})
         self.assertEqual(r.status_code, 200)

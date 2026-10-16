@@ -17,4 +17,10 @@ MEDIA_INTERNAL_PASSWORD = 'int-secret'
 MEDIA_HOOK_KEY = 'hook-key-for-tests'
 MEDIA_API_URL = 'http://lab-media-test:9100'
 FORCE_SCRIPT_NAME = '/peripheriques-api'
-LOGGING = {'version': 1, 'disable_existing_loggers': False}
+LOGGING = {
+    'version': 1, 'disable_existing_loggers': False,
+    # Hors des tests d'inventaire, lab-media n'existe pas : un avertissement par liste lue.
+    'handlers': {'null': {'class': 'logging.NullHandler'}},
+    'loggers': {'api.inventory': {'handlers': ['null'], 'propagate': False}},
+}
+DEVICE_SYNC_TTL_S = 0   # chaque liste relit l'inventaire : les tests ne dépendent pas de l'ordre

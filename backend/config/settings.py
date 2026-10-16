@@ -216,3 +216,7 @@ LOGGING = {
 # Catalogue « Matériel conseillé » (contrat I7, v6) — servi tel quel aux admins
 # par /api/admin/materiel/, relu à chaque requête.
 MATERIEL_PATH = os.path.join(BASE_DIR, 'api', 'data', 'materiel.json')
+
+# Inventaire des périphériques (chantier webcams, I1) : délai minimal entre deux
+# lectures de GET /v1/devices de lab-media, par processus (cf. api/inventory.py).
+DEVICE_SYNC_TTL_S = config('DEVICE_SYNC_TTL_S', default=10, cast=float)

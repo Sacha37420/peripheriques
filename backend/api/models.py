@@ -2,10 +2,40 @@ from django.db import models
 
 
 class Device(models.Model):
-    """Périphérique de l'hôte publié par lab-media sous `<slug>/{video,audio,av}` (I1)."""
+    """Périphérique de l'hôte tel que lab-media le décrit (contrat webcams, I0/I1).
 
-    slug = models.SlugField(primary_key=True, max_length=50)
+    `slug` porte l'identifiant I0 calculé par lab-media (`usb-<vid>-<pid>-<s|p>…`,
+    ou `webcam-ancienne` pour l'entrée héritée) : il ne change jamais pour un même
+    appareil. Le nom d'affichage (`label`) est propre à l'app : `model` à la
+    création, modifiable ensuite par les administrateurs des droits, jamais
+    réécrit par la synchronisation.
+
+    Les chemins MediaMTX (`path_*`) sont ceux que donne I1, jamais recomposés :
+    le hook (I2), la relecture et l'expulsion retrouvent le périphérique par eux.
+    Tout le reste est le dernier état connu de l'inventaire (`api.inventory`).
+    """
+
+    STATES = ('live', 'waiting', 'starting', 'error', 'offline', 'legacy')
+
+    slug = models.SlugField(primary_key=True, max_length=64)
     label = models.CharField(max_length=100)
+    model = models.CharField(max_length=100, blank=True, default='')
+    vendor_id = models.CharField(max_length=4, blank=True, default='')
+    product_id = models.CharField(max_length=4, blank=True, default='')
+    serial = models.CharField(max_length=64, blank=True, default='')
+    usb_port = models.CharField(max_length=64, blank=True, default='')
+    has_audio = models.BooleanField(default=False)
+    connected = models.BooleanField(default=False)
+    state = models.CharField(max_length=20, blank=True, default='')
+    error_detail = models.CharField(max_length=300, blank=True, default='')
+    record = models.BooleanField(default=False)
+    first_seen = models.DateTimeField(null=True, blank=True)
+    last_seen = models.DateTimeField(null=True, blank=True)
+    path_av = models.CharField(max_length=120, blank=True, default='')
+    path_video = models.CharField(max_length=120, blank=True, default='')
+    path_audio = models.CharField(max_length=120, blank=True, default='')
+    # Faux quand la dernière lecture réussie de l'inventaire ne le contenait plus.
+    listed = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'devices'
@@ -13,6 +43,30 @@ class Device(models.Model):
 
     def __str__(self) -> str:
         return self.slug
+
+    def paths(self) -> dict[str, str | None]:
+        """Chemins connus, par kind ; None si absent (pas de micro)."""
+        return {'av': self.path_av or None, 'video': self.path_video or None,
+                'audio': self.path_audio or None}
+
+    def kind_of(self, path: str) -> str | None:
+        """Kind ('av' | 'video' | 'audio') du chemin `path` pour CE périphérique."""
+        for kind, known in self.paths().items():
+            if known and known == path:
+                return kind
+        return None
+
+    @classmethod
+    def by_path(cls, path: str) -> 'tuple[Device, str] | tuple[None, None]':
+        """Retrouve le périphérique par un chemin exact parmi ses chemins connus.
+        Chemin vide, inconnu ou ambigu (deux périphériques) ⇒ (None, None)."""
+        if not isinstance(path, str) or not path:
+            return None, None
+        found = list(cls.objects.filter(
+            models.Q(path_av=path) | models.Q(path_video=path) | models.Q(path_audio=path))[:2])
+        if len(found) != 1:
+            return None, None
+        return found[0], found[0].kind_of(path)
 
 
 class Grant(models.Model):

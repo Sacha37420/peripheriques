@@ -51,8 +51,9 @@ _HOUR = timedelta(hours=1)
 _FRACTION = re.compile(r'(\.\d{6})\d+')
 
 
-def _av_path(slug: str) -> str:
-    return f'{slug}/av'
+def _av_path(device: Device) -> str:
+    """Chemin enregistré du périphérique, tel que I1 le donne (jamais recomposé)."""
+    return device.path_av
 
 
 def _parse_mtx_start(value) -> datetime:
@@ -120,7 +121,7 @@ class RecordingListView(APIView):
                             status=status.HTTP_403_FORBIDDEN)
 
         try:
-            ranges = media_client.playback_list(_av_path(device.slug))
+            ranges = media_client.playback_list(_av_path(device))
         except media_client.MediaError as exc:
             log.warning('recordings list %s : %s', device.slug, exc)
             return Response({'detail': 'Serveur média indisponible.'},
@@ -332,8 +333,11 @@ def recording_stream(request):
     except (signing.BadSignature, KeyError, TypeError, ValueError):
         return _forbidden()
 
+    device = _device_or_none(slug)
+    if device is None or not device.path_av:
+        return _forbidden()
     try:
-        upstream = media_client.playback_get(_av_path(slug), iso(start), duration)
+        upstream = media_client.playback_get(_av_path(device), iso(start), duration)
     except media_client.MediaError as exc:
         log.warning('recordings stream %s : %s', slug, exc)
         return HttpResponse(status=502)
