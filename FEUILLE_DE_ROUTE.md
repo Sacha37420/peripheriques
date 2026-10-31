@@ -40,3 +40,43 @@ courses simulées) ; migrations 0003/0004 jouées sur PostgreSQL jetable (avant/
 droits et `since` identiques) ; 0005/0006 sur PostgreSQL jetable : deux « HD USB Camera » →
 « hd usb camera » et « HD USB Camera 2 », doublon refusé par l'index (IntegrityError) ; `makemigrations --check`
 sans écart ; `npm run build` vert. Non vérifié : navigateur réel, lab-media réel (pas encore livré).
+
+---
+
+Lots ajoutés par l'analyse du 2026-10-31 (vue d'ensemble : `to_do_global.md` à la racine du dépôt
+du lab). [C] constaté, [D] déduit.
+
+## Lot 2 — Remise au propre de la documentation   ·   statut : à faire
+**Objectif :** une feuille de route et des notes qui disent l'état réel.
+**Constat [C] :**
+- Lot 1 : deux cases restent `[ ]` (« Mise en service… », « Après mise en service… ») alors que le
+  paragraphe « Vérifié le » relate la mise en service.
+- Ce paragraphe est entrelacé : le texte est coupé au milieu.
+- `chantiers/peripheriques/INTEGRATION.md` parle encore de `peripheriques-media` et de la Bbox.
+**Tâches :**
+- [ ] Cocher ou corriger les cases du Lot 1 et démêler son « Vérifié le »
+- [ ] Archiver ou réécrire `INTEGRATION.md` (fichier d'architecte)
+- [ ] `README.md` : droits par email, rôle de lab-media, page Périphériques, limites (H.264 dans le runner)
+**Tests à passer avant de clore le lot :**
+- [ ] Relecture ; `validate-app.sh peripheriques --quality-only` vert
+**Vérifié le :**
+
+## Lot 3 — Vérifications manuelles en conditions réelles   ·   statut : à faire
+**Objectif :** Ⓟ prouver ce que le runner ne peut pas voir.
+**Tâches :**
+- [ ] Image du direct H.264 dans un vrai navigateur
+- [ ] WebRTC depuis le WAN (port 8189 redirigé sur la Freebox)
+- [ ] Révocation pendant une lecture en cours : la lecture est expulsée
+- [ ] Un membre non admin des droits reçoit 403 sur `/api/admin/devices/`
+- [ ] Cause des réinitialisations USB (`INTEGRATION.md` §2-3)
+**Tests à passer avant de clore le lot :**
+- [ ] Liste ci-dessus cochée et datée
+**Vérifié le :**
+
+## Lot 4 — Gabarit front   ·   statut : à faire
+**Objectif :** même comportement que le gabarit corrigé (T3). Les polices sont déjà en chemin relatif ; le `redirectUri` est déjà sur la page courante.
+**Tâches :**
+- [ ] `tokenBases()` ; PKCE
+**Tests à passer avant de clore le lot :**
+- [ ] Cloisonnement 3/3 ; lien direct conservé
+**Vérifié le :**
