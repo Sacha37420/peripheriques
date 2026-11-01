@@ -5,10 +5,7 @@ import {
   AdminDevice, AdminDeviceList, AdminDevicePatch, Device, Grant, GrantCreate, GrantDevice, Materiel,
   GrantPatch, Me, Segment, Ticket, TicketRequest,
 } from './models';
-
-interface EnvWindow {
-  __env?: { apiUrl?: string };
-}
+import { apiUrl } from './env';
 
 /** Encode chaque segment d'un chemin MediaMTX sans toucher aux « / » qui les séparent. */
 function encodePath(path: string): string {
@@ -22,7 +19,7 @@ export class ApiService {
 
   /** Ex. https://<domaine>/peripheriques-api (pas de / final). */
   get base(): string {
-    return ((window as unknown as EnvWindow).__env?.apiUrl ?? 'http://localhost:8101').replace(/\/+$/, '');
+    return apiUrl();
   }
 
   /** Origine de l'API — les URLs absolues-chemin rendues par l'API (ticket) s'y résolvent. */

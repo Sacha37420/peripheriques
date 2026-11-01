@@ -73,10 +73,11 @@ du lab). [C] constaté, [D] déduit.
 - [ ] Liste ci-dessus cochée et datée
 **Vérifié le :**
 
-## Lot 4 — Gabarit front   ·   statut : à faire
+## Lot 4 — Gabarit front   ·   statut : en cours
 **Objectif :** même comportement que le gabarit corrigé (T3). Les polices sont déjà en chemin relatif ; le `redirectUri` est déjà sur la page courante.
 **Tâches :**
-- [ ] `tokenBases()` ; PKCE
+- [x] `tokenBases()` (l'API de l'app seule ; WHEP/HLS posent leur en-tête eux-mêmes, hors intercepteur) ; PKCE ; `redirectUri` par `loginRedirectUri` (chantier failles, I2)
+- [x] Ports liés à `${LAB_BIND_ADDR:-127.0.0.1}` (chantier failles, I1)
 **Tests à passer avant de clore le lot :**
 - [ ] Cloisonnement 3/3 ; lien direct conservé
-**Vérifié le :**
+**Vérifié le :** 2026-11-01 — non déployé. `ESSAI_CMD='python manage.py test --settings=config.settings_test' bash chantiers/tests/essai.sh peripheriques` : 163 tests OK ; image `peripheriques-frontend:candidat` construite ; `docker compose config` : `host_ip: 127.0.0.1`. Navigateur : après déploiement.

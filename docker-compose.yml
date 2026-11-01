@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8101:8000"
+      - "${LAB_BIND_ADDR:-127.0.0.1}:8101:8000"
     networks:
       - sso-net     # Keycloak (clés du realm, compte de service), Caddy
       - dev-net     # PostgreSQL ; lab-media-auth (API de contrôle, et c'est par ce réseau
@@ -57,7 +57,7 @@ services:
       PORT_BACKEND: ${PORT_BACKEND:-}
       PORT_FRONTEND: ${PORT_FRONTEND:-}
     ports:
-      - "4216:80"
+      - "${LAB_BIND_ADDR:-127.0.0.1}:4216:80"
     networks:
       - sso-net
     labels:
