@@ -79,7 +79,7 @@ du lab). [C] constaté, [D] déduit.
 - [x] `tokenBases()` (l'API de l'app seule ; WHEP/HLS posent leur en-tête eux-mêmes, hors intercepteur) ; PKCE ; `redirectUri` par `loginRedirectUri` (chantier failles, I2)
 - [x] Ports liés à `${LAB_BIND_ADDR:-127.0.0.1}` (chantier failles, I1)
 **Tests à passer avant de clore le lot :**
-- [ ] Cloisonnement 3/3 ; lien direct conservé
+- [x] Cloisonnement 3/3 ; lien direct conservé — vérifié le 2026-11-01 (lab-runner, `e2e_member`)
 **Vérifié le :** 2026-11-01 — non déployé. `ESSAI_CMD='python manage.py test --settings=config.settings_test' bash chantiers/tests/essai.sh peripheriques` : 163 tests OK ; image `peripheriques-frontend:candidat` construite ; `docker compose config` : `host_ip: 127.0.0.1`. Navigateur : après déploiement.
 
 ## Mise en service — chantier « failles » (2026-11-01)
