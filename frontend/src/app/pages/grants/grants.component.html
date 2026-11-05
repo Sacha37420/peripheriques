@@ -12,6 +12,100 @@
     <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">Actualiser</button>
   </header>
 
+  <section class="card cutoff" data-test="cutoff" [class.cutoff-on]="cutoff()?.active"
+           aria-labelledby="cutoff-title">
+    <div class="cutoff-head">
+      <h2 id="cutoff-title">Direct et enregistrements</h2>
+      @if (cutoff(); as c) {
+        @if (c.active) {
+          <span class="badge badge-red" data-test="cutoff-state">Coupés depuis le {{ fmt(c.since!) }}</span>
+        } @else {
+          <span class="badge badge-green" data-test="cutoff-state">En service</span>
+        }
+      }
+    </div>
+
+    @if (cutoff(); as c) {
+      @if (c.active) {
+        <p class="cutoff-text">
+          Personne ne regarde le direct par cette application et aucune webcam ne s’enregistre,
+          jusqu’au rétablissement. Les enregistrements existants restent relisibles.
+          @if (c.by) { Coupure demandée par {{ c.by }}. }
+        </p>
+        @if (c.paused.length) {
+          <p class="cutoff-text" data-test="cutoff-paused">
+            Enregistrement suspendu, rétabli à la réactivation : {{ labels(c.paused) }}.
+          </p>
+        }
+      } @else {
+        <p class="cutoff-text">
+          Couper interrompt toutes les lectures en direct par cette application et arrête tous les
+          enregistrements ; à la réactivation, chaque webcam reprend son réglage d’enregistrement
+          d’avant. La relecture des enregistrements existants n’est pas concernée.
+        </p>
+      }
+      <p class="cutoff-note">
+        L’accès accordé par le pont de l’agenda (personnes en lien avec un modèle) n’est pas coupé.
+      </p>
+
+      @if (stopFailures().length || restoreFailures().length || c.media_errors.length) {
+        <div class="cutoff-warn" role="alert" data-test="cutoff-failures">
+          @if (stopFailures().length) {
+            <p>Enregistrement <strong>non coupé</strong> : {{ labels(stopFailures()) }}.</p>
+          }
+          @if (restoreFailures().length) {
+            <p>Enregistrement <strong>non rétabli</strong> : {{ labels(restoreFailures()) }}.</p>
+          }
+          @for (code of c.media_errors; track code) { <p>{{ mediaErrorText(code) }}</p> }
+          <p>Le serveur média n’a pas répondu : réessayez dans un instant.</p>
+        </div>
+      }
+
+      @if (cutoffConfirm() === null) {
+        <div class="cutoff-actions">
+          @if (c.active) {
+            <button type="button" class="btn btn-primary" data-test="cutoff-restore"
+                    [disabled]="cutoffBusy()" (click)="askCutoff(false)">Rétablir le direct et les enregistrements</button>
+            @if (cutoffIncomplete()) {
+              <button type="button" class="btn btn-ghost" data-test="cutoff-retry"
+                      [disabled]="cutoffBusy()" (click)="applyCutoff(true)">Réessayer la coupure</button>
+            }
+          } @else {
+            <button type="button" class="btn btn-danger" data-test="cutoff-cut"
+                    [disabled]="cutoffBusy()" (click)="askCutoff(true)">Couper le direct et les enregistrements</button>
+            @if (cutoffIncomplete()) {
+              <button type="button" class="btn btn-ghost" data-test="cutoff-retry"
+                      [disabled]="cutoffBusy()" (click)="applyCutoff(false)">Réessayer le rétablissement</button>
+            }
+          }
+        </div>
+      } @else {
+        <div class="confirm-box cutoff-actions" data-test="cutoff-confirm">
+          <span>
+            @if (cutoffConfirm()) {
+              Couper le direct pour tous et arrêter tous les enregistrements ?
+            } @else {
+              Rétablir le direct et reprendre les enregistrements suspendus ?
+            }
+          </span>
+          <button type="button" [class]="cutoffConfirm() ? 'btn btn-danger' : 'btn btn-primary'"
+                  data-test="cutoff-confirm-yes" [disabled]="cutoffBusy()"
+                  (click)="applyCutoff(cutoffConfirm()!)">Confirmer</button>
+          <button type="button" class="btn btn-ghost" data-test="cutoff-confirm-no"
+                  [disabled]="cutoffBusy()" (click)="cancelCutoff()">Annuler</button>
+        </div>
+      }
+    } @else if (!cutoffErrors().length) {
+      <p class="loading-msg">Chargement…</p>
+    }
+
+    @if (cutoffErrors().length) {
+      <div class="msgs" role="alert" data-test="cutoff-errors">
+        @for (msg of cutoffErrors(); track $index) { <p class="error-msg">{{ msg }}</p> }
+      </div>
+    }
+  </section>
+
   <form class="card add" data-test="grant-form" (submit)="submit($event)">
     <h2>Accorder un droit</h2>
     <div class="add-fields">

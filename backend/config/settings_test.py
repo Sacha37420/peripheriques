@@ -15,6 +15,7 @@ PERIPHERIQUES_ADMIN_GROUPS = 'developers'
 MEDIA_INTERNAL_USER = 'backend'
 MEDIA_INTERNAL_PASSWORD = 'int-secret'
 MEDIA_HOOK_KEY = 'hook-key-for-tests'
+PERIPHERIQUES_BRIDGE_KEY = 'b' * 64
 MEDIA_API_URL = 'http://lab-media-test:9100'
 FORCE_SCRIPT_NAME = '/peripheriques-api'
 LOGGING = {

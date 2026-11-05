@@ -12,10 +12,10 @@ from rest_framework.exceptions import APIException, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import inventory, keycloak_admin, media_client
+from . import cutoff, inventory, keycloak_admin, media_client
 from .access import CAPS, has_any, iso, now_s, rights_for
 from .kick import kick_paths, kick_revoked
-from .models import Device, Grant
+from .models import Cutoff, Device, Grant
 from .permissions import IsPeripheriquesAdmin
 from .serializers import (NO_ACCOUNT, GrantCreateSerializer, GrantSerializer,
                           GrantUpdateSerializer)
@@ -182,6 +182,12 @@ LABEL_ERROR = "Nom d'affichage : de 1 à 60 caractères, sur une seule ligne."
 LABEL_TAKEN = "Ce nom est déjà porté par un autre périphérique : choisissez-en un autre."
 MEDIA_DOWN = 'Serveur média indisponible.'
 MEDIA_ODD = 'Réponse inattendue du serveur média.'
+CUTOFF_HOLDS = ("Le direct et les enregistrements sont coupés : l'enregistrement ne peut pas "
+                "être activé avant leur rétablissement (page Droits).")
+
+
+class _CutoffHolds(Exception):
+    pass
 
 
 def admin_device(device: Device, grants: int | None = None) -> dict:
@@ -264,7 +270,9 @@ class AdminDeviceView(APIView):
 
         if 'record' in body:
             try:
-                item = media_client.set_device_record(device.slug, body['record'])
+                item = self._set_record(device, body['record'])
+            except _CutoffHolds:
+                return Response({'record': [CUTOFF_HOLDS]}, status=409)
             except media_client.DeviceRefused as exc:
                 if exc.status == 409 and exc.code == 'legacy':
                     return Response({'record': ["L'ancienne webcam ne s'enregistre plus."]},
@@ -279,6 +287,8 @@ class AdminDeviceView(APIView):
                 return Response({'detail': MEDIA_DOWN}, status=503)
             device.record = item.get('record') is True
             inventory.invalidate()
+            # Réglage explicite d'un admin : la coupure ne le rétablira pas à sa place.
+            cutoff.forget(device.slug)
         if label is not None:
             previous, device.label = device.label, label
             try:
@@ -292,6 +302,15 @@ class AdminDeviceView(APIView):
         else:
             device.save()
         return Response(admin_device(device))
+
+    @staticmethod
+    def _set_record(device: Device, record: bool) -> dict:
+        """Relais à lab-media, sous le verrou de la coupure : une activation concurrente
+        attend la fin de ce réglage, puis le voit dans l'inventaire et l'arrête."""
+        with transaction.atomic():
+            if Cutoff.locked().active and record:
+                raise _CutoffHolds()
+            return media_client.set_device_record(device.slug, record)
 
     def delete(self, request, slug):
         device = self._device(slug)
@@ -313,6 +332,7 @@ class AdminDeviceView(APIView):
         slug = device.slug
         device.delete()                  # ses droits partent avec lui (CASCADE)
         inventory.invalidate()
+        cutoff.forget(slug)              # rebranché plus tard, il revient comme neuf
         kick_paths(paths, f'oubli de {slug}')
         log.info('Périphérique %s oublié par %s', slug, request.user.email)
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -88,3 +88,39 @@ que l'ancienne tournait, `scripts/app-test.sh` : 163 tests OK, puis `up -d --no-
 publiés sur `127.0.0.1` ; client Keycloak passé en PKCE S256 exigé, URI de retour réduites à celles de
 l'app (`create-app-client.sh --pkce --prune-uris`) ; cloisonnement `lab-runner` 3/3 avant et après le durcissement du client, puis de nouveau 3/3 sur Keycloak 26.8.1.
 Restent les vérifications en navigateur réel notées dans les lots (images, coffres de clés, envois).
+
+## Lot 5 — Coupure du direct et pont « caméras d'un modèle »   ·   statut : en cours
+**Objectif :** sur la page Droits, un bouton (admins des droits) coupe le direct pour tous et
+arrête les enregistrements jusqu'à la réactivation ; google-agenda (dev2) montre à ceux qui sont
+en lien avec un modèle les webcams auxquelles ce modèle a droit, sans être soumis à la coupure.
+Chantier `chantiers/webcams-modeles` (contrat v1 : I0 coupure, I1 pont, I2 ticket `pt1.`).
+**Tâches :**
+- [x] Modèle `Cutoff` (ligne unique, migration 0007) ; `GET/POST /api/admin/cutoff/ {active}`
+  (`api/cutoff.py`) : coupure acquise en base avant tout appel à lab-media, expulsion de toutes
+  les lectures WebRTC/HLS sauf celles du pont (`kick.kick_direct`, liste prise chez lab-media),
+  `record=false` sur chaque webcam enregistrée et liste gardée (`paused`), rétablissement exact
+  à la levée (webcam oubliée ignorée), échecs gardés et rejouables (`failures`, `media_errors`)
+- [x] Hook : refus de tout jeton Keycloak pendant la coupure ; `PATCH record=true` → 409 ;
+  un réglage manuel ou un oubli retire la webcam de ce que la coupure rétablira
+- [x] `POST /api/bridge/model-cameras/` (`api/bridge.py`, vue Django hors DRF) : clé
+  `Authorization: Bridge <PERIPHERIQUES_BRIDGE_KEY>` en temps constant en tout premier, 404
+  identiques (clé absente, fausse, vide), 405 hors POST, 400 corps invalide, forme I1 exacte
+- [x] Ticket `pt1.` (signing, sel propre, 120 s) vérifié par le hook avant tout JWT : WebRTC
+  seulement, droit du modèle au moment du hook, session gardée au nom du modèle marquée « pont »
+  (refusée si elle ne peut pas être gardée) ; la révocation d'un droit du modèle l'expulse
+- [x] Filtre de journal : `Bridge …` et `pt1.…` masqués (filet ; aucun code ne les écrit)
+- [x] Frontend : carte « Direct et enregistrements » en tête de la page Droits (confirmation,
+  « Coupés depuis le … », webcams suspendues, échecs non coupés / non rétablis, « Réessayer »)
+- [ ] Mise en service et parcours réel (architecte) : clé posée dans `.env`, essai avec google-agenda
+**Tests à passer avant de clore le lot :**
+- [x] `python manage.py test --settings=config.settings_test` (dont `api.tests.test_webcams_modeles`)
+- [x] `npm run build`
+- [ ] Après mise en service : couper → le direct d'un membre est expulsé et refusé, les webcams
+  enregistrées s'arrêtent ; le direct d'un watcher par google-agenda continue ; rétablir → les
+  mêmes webcams se remettent à enregistrer
+**Vérifié le :** 2026-11-05 — non déployé. `essai.sh peripheriques` : 196 tests OK (33 nouveaux),
+`makemigrations --check` sans écart, migration 0007 jouée avant/arrière/avant sur PostgreSQL
+jetable, nouveaux tests rejoués aussi sur PostgreSQL (98 OK) ; cinq mutations des contrôles
+(protocole, coupure au hook, épargne du pont, clé vide, échéance) chacune détectée par un test ;
+`npm run build` vert. Non vérifié : lab-media et MediaMTX réels (le ticket dans l'en-tête WHEP),
+navigateur réel, appel réel depuis google-agenda.

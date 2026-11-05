@@ -29,9 +29,10 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.exceptions import AuthenticationFailed
 
+from . import bridge
 from .access import kind_allowed, rights_for
 from .authentication import validate_token
-from .models import Device, MediaSession
+from .models import Cutoff, Device, MediaSession
 
 log = logging.getLogger('api.hook')
 
@@ -89,6 +90,15 @@ def _read(body: dict, path) -> HttpResponse:
         return _deny()
     if token.startswith('Bearer '):
         token = token[7:]
+
+    # Ticket du pont (I2) — reconnu à son préfixe AVANT toute validation de JWT. La coupure
+    # (I0) n'est pas consultée sur ce chemin.
+    if bridge.is_ticket(token):
+        return _read_ticket(body, token, device, kind, path)
+
+    # Jeton Keycloak : refusé d'office tant que la coupure tient (relue en base à chaque appel).
+    if Cutoff.is_active():
+        return _deny()
     try:
         user = validate_token(token)
     except AuthenticationFailed:
@@ -99,18 +109,48 @@ def _read(body: dict, path) -> HttpResponse:
 
     session_id = body.get('id')
     if isinstance(session_id, str) and session_id:
-        _remember(session_id, user, path, body.get('protocol') or '')
+        _remember(session_id, user.email, path, body.get('protocol') or '')
     return _allow()
 
 
-def _remember(session_id: str, user, path: str, protocol: str) -> None:
-    """Garde la session pour pouvoir l'expulser à la révocation. Best-effort :
-    un échec d'écriture ne doit pas refuser une lecture légitime."""
+def _read_ticket(body: dict, token: str, device: Device, kind: str, path: str) -> HttpResponse:
+    """Lecture par ticket : signature et validité (120 s), WebRTC seulement, et droit du
+    MODÈLE sur ce chemin au moment même du hook.
+
+    La session est gardée au nom du modèle (sa révocation coupe ses watchers par
+    `kick_revoked`), marquée « pont » (la coupure l'épargne). Contrairement à une lecture par
+    JWT, une session qu'on ne peut pas garder est refusée : sans ligne, ni la révocation du
+    modèle ni l'épargne de la coupure ne sauraient la retrouver."""
+    claims = bridge.read_ticket(token)
+    if claims is None:
+        return _deny()
+    model_email, viewer_email = claims
+    if body.get('protocol') != 'webrtc':
+        return _deny()
+    if not kind_allowed(rights_for(model_email, device), kind):
+        return _deny()
+    session_id = body.get('id')
+    if not (isinstance(session_id, str) and session_id):
+        return _deny()
+    if not _remember(session_id, model_email, path, 'webrtc', viewer_email=viewer_email):
+        return _deny()
+    log.info('Lecture par le pont : %s regarde %s (droits de %s)', viewer_email, path, model_email)
+    return _allow()
+
+
+def _remember(session_id: str, email: str, path: str, protocol: str,
+              viewer_email: str | None = None) -> bool:
+    """Garde la session pour pouvoir l'expulser à la révocation. Best-effort pour une
+    lecture par JWT : un échec d'écriture ne doit pas refuser une lecture légitime."""
     try:
         MediaSession.objects.update_or_create(
             id=session_id[:100],
-            defaults={'email': user.email, 'path': path, 'protocol': str(protocol)[:20]},
+            defaults={'email': email, 'path': path, 'protocol': str(protocol)[:20],
+                      'bridge': viewer_email is not None,
+                      'viewer_email': viewer_email or ''},
         )
         MediaSession.objects.filter(last_seen__lt=timezone.now() - SESSION_RETENTION).delete()
     except Exception:  # noqa: BLE001
         log.exception('Enregistrement de la session %s impossible', session_id)
+        return False
+    return True

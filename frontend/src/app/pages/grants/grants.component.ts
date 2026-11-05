@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api.service';
-import { Grant, GrantDevice, GrantPatch, apiErrorMessages } from '../../core/models';
+import { CutoffState, Grant, GrantDevice, GrantPatch, apiErrorMessages } from '../../core/models';
 import { fmtDateTime } from '../../core/paris-time';
 
 type Cap = 'video' | 'audio';
@@ -43,11 +43,26 @@ export class GrantsComponent implements OnInit {
   readonly formErrors = signal<string[]>([]);
   readonly formSuccess = signal('');
 
+  // ── Coupure du direct et des enregistrements (I0) ──
+  readonly cutoff = signal<CutoffState | null>(null);
+  readonly cutoffErrors = signal<string[]>([]);
+  readonly cutoffBusy = signal(false);
+  /** Demande en attente de confirmation : true = couper, false = rétablir. */
+  readonly cutoffConfirm = signal<boolean | null>(null);
+  readonly stopFailures = computed(() => (this.cutoff()?.failures ?? []).filter(f => f.action === 'stop'));
+  readonly restoreFailures = computed(() => (this.cutoff()?.failures ?? []).filter(f => f.action === 'restore'));
+  /** Quelque chose reste à rejouer (échec d'une étape auprès du serveur média). */
+  readonly cutoffIncomplete = computed(() => {
+    const c = this.cutoff();
+    return !!c && (c.failures.length > 0 || c.media_errors.length > 0 || (!c.active && c.paused.length > 0));
+  });
+
   ngOnInit(): void {
     this.load();
   }
 
   load(): void {
+    this.loadCutoff();
     this.loading.set(true);
     this.loadErrors.set([]);
     forkJoin({ grants: this.api.getGrants(), devices: this.api.getGrantDevices() }).subscribe({
@@ -172,6 +187,51 @@ export class GrantsComponent implements OnInit {
         this.setBusy(g.id, false);
       },
     });
+  }
+
+  // ── Coupure ──
+  loadCutoff(): void {
+    this.api.getCutoff().subscribe({
+      next: c => { this.cutoff.set(c); this.cutoffErrors.set([]); },
+      error: err => this.cutoffErrors.set(apiErrorMessages(err)),
+    });
+  }
+
+  askCutoff(active: boolean): void {
+    this.cutoffErrors.set([]);
+    this.cutoffConfirm.set(active);
+  }
+
+  cancelCutoff(): void {
+    this.cutoffConfirm.set(null);
+  }
+
+  /** Couper / rétablir, ou rejouer la même demande après un échec (aucune confirmation). */
+  applyCutoff(active: boolean): void {
+    if (this.cutoffBusy()) return;
+    this.cutoffBusy.set(true);
+    this.cutoffErrors.set([]);
+    this.api.setCutoff(active).subscribe({
+      next: c => {
+        this.cutoff.set(c);
+        this.cutoffConfirm.set(null);
+        this.cutoffBusy.set(false);
+      },
+      error: err => {
+        this.cutoffErrors.set(apiErrorMessages(err));
+        this.cutoffBusy.set(false);
+      },
+    });
+  }
+
+  mediaErrorText(code: string): string {
+    if (code === 'sessions') return 'Les lectures en cours n’ont pas toutes pu être interrompues.';
+    if (code === 'inventory') return 'La liste des webcams n’a pas pu être relue : le dernier état connu a été utilisé.';
+    return 'Une étape n’a pas pu joindre le serveur média.';
+  }
+
+  labels(items: { label: string }[]): string {
+    return items.map(i => i.label).join(', ');
   }
 
   // ── Utilitaires ──

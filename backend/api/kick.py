@@ -88,3 +88,42 @@ def _kick(queryset, must_go, what: str) -> int:
             log.info('Session %s %s (%s, %s) coupée après révocation',
                      protocol, row.id, row.email, row.path)
     return kicked
+
+
+def kick_direct(errors: list[str]) -> int:
+    """Coupure (contrat webcams-modeles, I0) : expulse TOUTE lecture en cours, WebRTC et HLS,
+    sur les chemins de l'app, sauf les sessions ouvertes par un ticket du pont.
+
+    La liste vient de lab-media, pas de `MediaSession` : une lecture par jeton Keycloak dont la
+    ligne n'aurait pas pu être gardée par le hook (écriture best-effort) est expulsée aussi.
+    Seule une session connue comme « pont » (même protocole, même id) est épargnée. Les
+    publications (`state` ≠ `read`) ne sont jamais touchées.
+
+    `errors` reçoit le protocole de chaque liste ou expulsion qui n'a pas abouti (lab-media
+    injoignable) ; renvoie le nombre de sessions expulsées."""
+    spared = set(MediaSession.objects.filter(bridge=True).values_list('protocol', 'id'))
+    kicked = 0
+    for protocol in media_client.SESSION_PROTOCOLS:
+        try:
+            live = media_client.list_sessions(protocol)
+        except Exception as exc:  # noqa: BLE001
+            log.warning('Coupure : sessions %s illisibles : %s', protocol, exc)
+            errors.append(protocol)
+            continue
+        for item in live:
+            sid = item.get('id') if isinstance(item, dict) else None
+            if not isinstance(sid, str) or not sid or item.get('state') != 'read':
+                continue
+            if (protocol, sid) in spared:
+                continue
+            try:
+                media_client.kick_session(protocol, sid)
+            except Exception as exc:  # noqa: BLE001
+                log.warning('Coupure : expulsion %s de %s échouée : %s', protocol, sid, exc)
+                if protocol not in errors:
+                    errors.append(protocol)
+                continue
+            MediaSession.objects.filter(id=sid).delete()
+            kicked += 1
+    log.info('Coupure : %d lecture(s) en direct expulsée(s)', kicked)
+    return kicked

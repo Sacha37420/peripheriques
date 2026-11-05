@@ -17,13 +17,16 @@ import logging
 import re
 
 _SECRET_QS = re.compile(r'(?i)([?&](?:key|ticket)=)[^&\s"\']*')
+# Pont (webcams-modeles) : clé `Authorization: Bridge …` et tickets `pt1.…`. Aucun code ne les
+# écrit ; filet de sécurité si un en-tête ou un jeton finissait dans un message.
+_BRIDGE = re.compile(r'(Bridge\s+|\bpt1\.)[^\s"\',]+')
 
 # Loggers qui écrivent l'URL demandée (ou pourraient l'écrire).
 ACCESS_LOGGERS = ('django.server', 'django.request', 'gunicorn.access', 'gunicorn.error')
 
 
 def redact(text: str) -> str:
-    return _SECRET_QS.sub(r'\1***', text)
+    return _BRIDGE.sub(r'\1***', _SECRET_QS.sub(r'\1***', text))
 
 
 class RedactSecretsFilter(logging.Filter):

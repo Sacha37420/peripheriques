@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import SimpleRouter
 
-from . import hook, recordings
+from . import bridge, cutoff, hook, recordings
 from .views import (AdminDeviceListView, AdminDeviceView, DeviceListView, GrantViewSet,
                     MaterielView, MeView)
 
@@ -15,6 +15,8 @@ urlpatterns = [
     path('admin/materiel/', MaterielView.as_view()),
     path('admin/devices/', AdminDeviceListView.as_view()),
     path('admin/devices/<str:slug>/', AdminDeviceView.as_view()),
+    path('admin/cutoff/', cutoff.CutoffView.as_view()),
+    path('bridge/model-cameras/', bridge.model_cameras),
     path('recordings/', recordings.RecordingListView.as_view()),
     path('recordings/ticket/', recordings.RecordingTicketView.as_view()),
     path('recordings/stream/', recordings.recording_stream),

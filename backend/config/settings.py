@@ -195,6 +195,10 @@ MEDIA_INTERNAL_USER = config('MEDIA_INTERNAL_USER', default='')
 MEDIA_INTERNAL_PASSWORD = config('MEDIA_INTERNAL_PASSWORD', default='')
 MEDIA_HOOK_KEY = config('MEDIA_HOOK_KEY', default='')
 
+# Pont « caméras d'un modèle » (contrat webcams-modeles, I1) : clé serveur que google-agenda
+# (cadriciel dev2) présente en `Authorization: Bridge <clé>`. Vide ⇒ pont désactivé (404).
+PERIPHERIQUES_BRIDGE_KEY = config('PERIPHERIQUES_BRIDGE_KEY', default='')
+
 # Compte de service peripheriques-admin (view-users/query-users) : vérifie
 # qu'un email existe dans le realm avant d'accorder un droit.
 KEYCLOAK_ADMIN_CLIENT_ID = config('KEYCLOAK_ADMIN_CLIENT_ID', default='')

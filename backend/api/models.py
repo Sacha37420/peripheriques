@@ -128,8 +128,55 @@ class MediaSession(models.Model):
     email = models.EmailField(max_length=255, db_index=True)
     path = models.CharField(max_length=120)
     protocol = models.CharField(max_length=20, blank=True)
+    # Session ouverte par un ticket du pont (contrat webcams-modeles, I2) : `email` est alors
+    # celui du MODÈLE (sa révocation coupe ses watchers), `viewer_email` celui du watcher
+    # (journal seulement). La coupure (I0) épargne ces sessions.
+    bridge = models.BooleanField(default=False)
+    viewer_email = models.EmailField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     last_seen = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'media_sessions'
+
+
+class Cutoff(models.Model):
+    """Coupure globale du direct et des enregistrements (contrat webcams-modeles, I0).
+
+    Une seule ligne (pk = 1), lue par le hook à chaque lecture : rien n'est mis en cache, une
+    coupure vaut pour toutes les lectures suivantes de tous les processus.
+
+      * `active` : le hook refuse toute lecture par jeton Keycloak ; `PATCH record=true` → 409 ;
+      * `paused` : identifiants des webcams dont l'enregistrement était actif et que la coupure
+        a arrêté (ou tenté d'arrêter) — exactement celles à rétablir à la réactivation. Une
+        ligne reste après une réactivation dont le rétablissement a échoué (rejouable) ;
+      * `failures` : [{"id", "action": "stop" | "restore"}] — dernier échec par webcam ;
+      * `media_errors` : codes fixes (`sessions`, `inventory`) d'une étape qui n'a pas pu
+        joindre lab-media lors du dernier passage.
+    """
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    active = models.BooleanField(default=False)
+    since = models.DateTimeField(null=True, blank=True)
+    by = models.EmailField(max_length=255, blank=True, default='')
+    paused = models.JSONField(default=list, blank=True)
+    failures = models.JSONField(default=list, blank=True)
+    media_errors = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'cutoff'
+
+    @classmethod
+    def current(cls) -> 'Cutoff':
+        return cls.objects.get_or_create(pk=1)[0]
+
+    @classmethod
+    def locked(cls) -> 'Cutoff':
+        """La ligne, verrouillée jusqu'à la fin de la transaction en cours."""
+        cls.objects.get_or_create(pk=1)
+        return cls.objects.select_for_update().get(pk=1)
+
+    @classmethod
+    def is_active(cls) -> bool:
+        return cls.objects.filter(pk=1, active=True).exists()

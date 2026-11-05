@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
-  AdminDevice, AdminDeviceList, AdminDevicePatch, Device, Grant, GrantCreate, GrantDevice, Materiel,
+  AdminDevice, AdminDeviceList, AdminDevicePatch, CutoffState, Device, Grant, GrantCreate, GrantDevice, Materiel,
   GrantPatch, Me, Segment, Ticket, TicketRequest,
 } from './models';
 import { apiUrl } from './env';
@@ -75,6 +75,16 @@ export class ApiService {
   /** Oublier un périphérique débranché : ses droits sont supprimés avec lui. */
   forgetAdminDevice(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/admin/devices/${encodeURIComponent(id)}/`);
+  }
+
+  /** Admins des droits : état de la coupure du direct et des enregistrements. */
+  getCutoff(): Observable<CutoffState> {
+    return this.http.get<CutoffState>(`${this.base}/api/admin/cutoff/`);
+  }
+
+  /** Active ou lève la coupure ; renvoyer la même demande rejoue ce qui a échoué. */
+  setCutoff(active: boolean): Observable<CutoffState> {
+    return this.http.post<CutoffState>(`${this.base}/api/admin/cutoff/`, { active });
   }
 
   /** date = YYYY-MM-DD, journée Europe/Paris. */

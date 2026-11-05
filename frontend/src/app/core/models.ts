@@ -200,3 +200,26 @@ export interface Materiel {
   summary: string[];
   items: MaterielItem[];
 }
+
+// ── Coupure du direct et des enregistrements (chantier webcams-modeles, I0 ; admins) ──
+export interface CutoffDevice {
+  id: string;
+  label: string;
+}
+
+export interface CutoffFailure extends CutoffDevice {
+  /** stop : l'enregistrement n'a pas pu être coupé ; restore : il n'a pas pu être rétabli. */
+  action: 'stop' | 'restore';
+}
+
+export interface CutoffState {
+  active: boolean;
+  /** ISO 8601 UTC ; null hors coupure. */
+  since: string | null;
+  by: string | null;
+  /** Webcams dont l'enregistrement a été arrêté par la coupure et sera rétabli. */
+  paused: CutoffDevice[];
+  failures: CutoffFailure[];
+  /** Étapes qui n'ont pas pu joindre le serveur média : 'sessions' | 'inventory'. */
+  media_errors: string[];
+}
