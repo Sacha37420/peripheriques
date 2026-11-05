@@ -57,10 +57,12 @@ class DeviceTests(TestCase):
                              granted_by=ADMIN)
         self.assertEqual(self.client.get('/api/devices/', **bearer(admin_token())).json(), [{
             'slug': 'webcam-ancienne', 'label': 'Ancienne webcam', 'online': True,
-            'has_audio': True,
-            'paths': {'av': 'webcam/av', 'video': 'webcam/video', 'audio': 'webcam/audio'},
+            'has_audio': True, 'kind': 'webcam', 'state': 'legacy',
+            'paths': {'av': 'webcam/av', 'video': 'webcam/video', 'audio': 'webcam/audio',
+                      'talk': None},
             'video': {'allowed': False, 'since': None},
             'audio': {'allowed': True, 'since': since.isoformat().replace('+00:00', 'Z')},
+            'speaker': {'allowed': False, 'since': None},
         }])
 
     def test_member_without_grant_sees_nothing(self, _ready):
@@ -114,8 +116,9 @@ class GrantTests(TestCase):
         self.assertIsNone(body['audio_since'])
         self.assertEqual(body['granted_by'], ADMIN)
         self.assertEqual(body['device'], 'webcam-ancienne')
-        self.assertEqual(set(body), {'id', 'email', 'device', 'video', 'audio', 'video_since',
-                                     'audio_since', 'granted_by', 'updated_at'})
+        self.assertEqual(set(body), {'id', 'email', 'device', 'video', 'audio', 'speaker',
+                                     'video_since', 'audio_since', 'speaker_since',
+                                     'granted_by', 'updated_at'})
         kc.assert_called_once_with(MEMBER)
         self.assertEqual(len(self.client.get('/api/grants/', **bearer(admin_token())).json()), 1)
 
@@ -279,7 +282,7 @@ class GrantDevicesTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json(), [{'slug': 'webcam-ancienne', 'label': 'Ancienne webcam',
                                      'online': True, 'has_audio': True, 'state': 'legacy',
-                                     'connected': False}])
+                                     'connected': False, 'kind': 'webcam'}])
         ready.assert_called_once_with('webcam/av')
         # /api/devices/ reste v3 : rien pour un admin sans Grant
         self.assertEqual(self.client.get('/api/devices/', **bearer(admin_token())).json(), [])

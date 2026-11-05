@@ -32,6 +32,19 @@ def device_item(dev_id='usb-32e4-9230-p3-4', model='HD USB Camera', has_audio=Fa
     }
 
 
+def speaker_item(dev_id='hp-jack', model='Haut-parleur (prise jack)', state='idle',
+                 connected=None):
+    """Haut-parleur de `GET /v1/devices` (contrat haut-parleur v1, I1) — recopié du contrat."""
+    return {
+        'id': dev_id, 'kind': 'speaker', 'model': model,
+        'vendor_id': '', 'product_id': '', 'serial': '', 'usb_port': '',
+        'has_audio': False, 'connected': (state != 'offline') if connected is None else connected,
+        'state': state, 'record': False,
+        'first_seen': '2026-11-05T10:00:00+01:00', 'last_seen': '2026-11-05T10:00:00+01:00',
+        'paths': {'av': None, 'video': None, 'audio': None, 'talk': f'speaker/{dev_id}'},
+    }
+
+
 LEGACY_ITEM = {
     'id': 'webcam-ancienne', 'kind': 'webcam', 'model': 'USB PHY 2.0',
     'vendor_id': '', 'product_id': '', 'serial': '', 'usb_port': '',
@@ -166,7 +179,10 @@ class FakeLabMedia:
                     mine = next((s for s in fake.sessions if s['protocol'] == protocol and s['id'] == sid), None)
                     if mine is None:
                         return self._err(404, 'unknown_session')
-                    if mine['state'] == 'publish':
+                    # I3 (haut-parleur) : une publication ne s'expulse que sur un chemin
+                    # `speaker/*` de l'app, en WebRTC.
+                    if mine['state'] == 'publish' and not (
+                            protocol == 'webrtc' and mine['path'].startswith('speaker/')):
                         return self._err(409, 'not_a_reader')
                     fake.sessions.remove(mine)
                     self.send_response(204)

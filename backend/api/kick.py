@@ -92,16 +92,21 @@ def _kick(queryset, must_go, what: str) -> int:
 
 def kick_direct(errors: list[str]) -> int:
     """Coupure (contrat webcams-modeles, I0) : expulse TOUTE lecture en cours, WebRTC et HLS,
-    sur les chemins de l'app, sauf les sessions ouvertes par un ticket du pont.
+    sur les chemins de l'app, et toute prise de parole sur un haut-parleur (contrat
+    haut-parleur : publication sur un chemin `talk` connu, I3), sauf les sessions ouvertes par
+    un ticket du pont.
 
     La liste vient de lab-media, pas de `MediaSession` : une lecture par jeton Keycloak dont la
     ligne n'aurait pas pu être gardée par le hook (écriture best-effort) est expulsée aussi.
     Seule une session connue comme « pont » (même protocole, même id) est épargnée. Les
-    publications (`state` ≠ `read`) ne sont jamais touchées.
+    publications ne sont touchées que sur un chemin `talk` d'un haut-parleur (lab-media refuse
+    d'expulser toute autre publication : la capture des webcams n'est jamais coupée).
 
     `errors` reçoit le protocole de chaque liste ou expulsion qui n'a pas abouti (lab-media
     injoignable) ; renvoie le nombre de sessions expulsées."""
     spared = set(MediaSession.objects.filter(bridge=True).values_list('protocol', 'id'))
+    talk_paths = set(Device.objects.filter(kind='speaker').exclude(path_talk='')
+                     .values_list('path_talk', flat=True))
     kicked = 0
     for protocol in media_client.SESSION_PROTOCOLS:
         try:
@@ -112,7 +117,12 @@ def kick_direct(errors: list[str]) -> int:
             continue
         for item in live:
             sid = item.get('id') if isinstance(item, dict) else None
-            if not isinstance(sid, str) or not sid or item.get('state') != 'read':
+            if not isinstance(sid, str) or not sid:
+                continue
+            state = item.get('state')
+            if not (state == 'read'
+                    or (state == 'publish' and protocol == 'webrtc'
+                        and item.get('path') in talk_paths)):
                 continue
             if (protocol, sid) in spared:
                 continue
@@ -125,5 +135,5 @@ def kick_direct(errors: list[str]) -> int:
                 continue
             MediaSession.objects.filter(id=sid).delete()
             kicked += 1
-    log.info('Coupure : %d lecture(s) en direct expulsée(s)', kicked)
+    log.info('Coupure : %d lecture(s) ou prise(s) de parole expulsée(s)', kicked)
     return kicked

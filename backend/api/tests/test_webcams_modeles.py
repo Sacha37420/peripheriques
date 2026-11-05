@@ -84,7 +84,8 @@ class BridgeTests(Case):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r['Content-Type'], 'application/json')
         body = r.json()
-        self.assertEqual(set(body), {'model_email', 'devices', 'ticket', 'expires_at'})
+        self.assertEqual(set(body), {'model_email', 'devices', 'speakers', 'ticket', 'expires_at'})
+        self.assertEqual(body['speakers'], [])
         self.assertEqual(body['model_email'], MODEL)
         # Ordre par nom d'affichage ; av seulement avec audio ET micro ; jamais d'audio seul.
         self.assertEqual(body['devices'], [
@@ -104,7 +105,7 @@ class BridgeTests(Case):
         self.grant(MIC_CAM, email=MODEL, video=False, audio=True)      # micro seul : exclu
         self.grant(CAM, email=OTHER, video=True)                       # droit d'un autre
         r = self.ask()
-        self.assertEqual(r.json(), {'model_email': MODEL, 'devices': [],
+        self.assertEqual(r.json(), {'model_email': MODEL, 'devices': [], 'speakers': [],
                                     'ticket': None, 'expires_at': None})
 
     def test_video_without_audio_right_on_mic_cam_has_null_av(self):

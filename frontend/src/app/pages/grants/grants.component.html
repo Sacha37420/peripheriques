@@ -4,7 +4,7 @@
       <h1>Droits d'accès</h1>
       <p class="subtitle">
         Les droits s'accordent par email, à un compte du lab existant, périphérique par périphérique
-        (vidéo, micro ou les deux). Un droit ne donne accès qu'aux enregistrements postérieurs à son
+        (vidéo, micro ou les deux ; « Parler » sur un haut-parleur). Un droit ne donne accès qu'aux enregistrements postérieurs à son
         octroi. Gérer les droits ne donne aucun accès : pour voir ou écouter, un administrateur
         s'accorde lui-même un droit.
       </p>
@@ -120,25 +120,29 @@
         <select id="grant-device" name="device" data-test="grant-device"
                 (change)="selectDevice($any($event.target).value)">
           @for (d of devices(); track d.slug) {
-            <option [value]="d.slug" [selected]="d.slug === device()">{{ d.label }}{{ d.has_audio ? '' : ' (vidéo seule)' }}</option>
+            <option [value]="d.slug" [selected]="d.slug === device()">{{ d.label }}{{ d.kind === 'speaker' ? ' (haut-parleur)' : (d.has_audio ? '' : ' (vidéo seule)') }}</option>
           }
         </select>
       </div>
     </div>
     <div class="add-actions">
-      <label class="check">
-        <input type="checkbox" name="video" data-test="grant-video"
-               [checked]="video()" (change)="video.set($any($event.target).checked)" />
-        Vidéo
-      </label>
-      @if (selectedHasMic()) {
-        <label class="check">
-          <input type="checkbox" name="audio" data-test="grant-audio"
-                 [checked]="audio()" (change)="audio.set($any($event.target).checked)" />
-          Micro
-        </label>
+      @if (selectedIsSpeaker()) {
+        <span class="no-mic" data-test="grant-speaker">Haut-parleur : droit « Parler » (sa voix en direct dans le haut-parleur)</span>
       } @else {
-        <span class="no-mic" data-test="grant-no-mic">Sans micro : vidéo seule</span>
+        <label class="check">
+          <input type="checkbox" name="video" data-test="grant-video"
+                 [checked]="video()" (change)="video.set($any($event.target).checked)" />
+          Vidéo
+        </label>
+        @if (selectedHasMic()) {
+          <label class="check">
+            <input type="checkbox" name="audio" data-test="grant-audio"
+                   [checked]="audio()" (change)="audio.set($any($event.target).checked)" />
+            Micro
+          </label>
+        } @else {
+          <span class="no-mic" data-test="grant-no-mic">Sans micro : vidéo seule</span>
+        }
       }
       <button type="submit" class="btn btn-primary" data-test="grant-submit" [disabled]="submitting()">
         Accorder
@@ -175,6 +179,7 @@
             <th>Périphérique</th>
             <th>Vidéo</th>
             <th>Micro</th>
+            <th>Parler</th>
             <th>Depuis</th>
             <th>Accordé par</th>
             <th>Mis à jour</th>
@@ -188,13 +193,17 @@
               <td class="email">{{ g.email }}</td>
               <td>{{ deviceLabel(g.device) }}</td>
               <td>
+                @if (!isSpeaker(g.device) || g.video) {
                 <label class="check" [attr.aria-label]="'Vidéo — ' + g.email">
                   <input type="checkbox" data-test="row-video" [checked]="g.video"
                          [disabled]="isBusy(g.id)" (change)="toggle(g, 'video', $event)" />
                 </label>
+                } @else {
+                  <span class="no-mic" title="Un haut-parleur ne se regarde pas">—</span>
+                }
               </td>
               <td>
-                @if (hasMic(g.device) || g.audio) {
+                @if ((hasMic(g.device) && !isSpeaker(g.device)) || g.audio) {
                   <label class="check" [attr.aria-label]="'Micro — ' + g.email">
                     <input type="checkbox" data-test="row-audio" [checked]="g.audio"
                            [disabled]="isBusy(g.id)" (change)="toggle(g, 'audio', $event)" />
@@ -203,9 +212,23 @@
                   <span class="no-mic" title="Ce périphérique n’a pas de micro">—</span>
                 }
               </td>
+              <td>
+                @if (isSpeaker(g.device) || g.speaker) {
+                  <label class="check" [attr.aria-label]="'Parler — ' + g.email">
+                    <input type="checkbox" data-test="row-speaker" [checked]="g.speaker"
+                           [disabled]="isBusy(g.id)" (change)="toggle(g, 'speaker', $event)" />
+                  </label>
+                } @else {
+                  <span class="no-mic" title="Ce périphérique n’est pas un haut-parleur">—</span>
+                }
+              </td>
               <td class="since">
-                <span>Vidéo : {{ since(g.video_since) }}</span>
-                <span>Micro : {{ since(g.audio_since) }}</span>
+                @if (isSpeaker(g.device)) {
+                  <span>Parler : {{ since(g.speaker_since) }}</span>
+                } @else {
+                  <span>Vidéo : {{ since(g.video_since) }}</span>
+                  <span>Micro : {{ since(g.audio_since) }}</span>
+                }
               </td>
               <td>{{ g.granted_by }}</td>
               <td class="nowrap">{{ fmt(g.updated_at) }}</td>
@@ -218,7 +241,7 @@
             </tr>
             @if (confirming() === g.id) {
               <tr class="sub confirm">
-                <td colspan="8">
+                <td colspan="9">
                   <div class="confirm-box">
                     <span>Révoquer l'accès de {{ g.email }} à {{ deviceLabel(g.device) }} ?</span>
                     <button type="button" class="btn btn-danger" data-test="revoke-confirm"
@@ -231,7 +254,7 @@
             }
             @if (rowErrors()[g.id]; as msgs) {
               <tr class="sub">
-                <td colspan="8">
+                <td colspan="9">
                   <div class="msgs" role="alert" data-test="row-errors" [attr.data-id]="g.id">
                     @for (msg of msgs; track $index) { <p class="error-msg">{{ msg }}</p> }
                   </div>

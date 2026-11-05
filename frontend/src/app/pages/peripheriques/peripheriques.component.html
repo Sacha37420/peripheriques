@@ -3,7 +3,8 @@
     <div>
       <h1>Périphériques</h1>
       <p class="subtitle">
-        Toutes les webcams déjà branchées sur l’hôte, branchées ou non. Une webcam nouvellement
+        Toutes les webcams déjà branchées sur l’hôte, branchées ou non, et les haut-parleurs
+        déclarés par le serveur média (prise jack : ils ne s’enregistrent jamais). Une webcam nouvellement
         branchée apparaît ici et dans la page Droits sans rien faire ; elle n’enregistre pas tant
         que son interrupteur n’est pas activé. Le nom d’affichage est propre à cette application et
         ne peut pas être celui d’un autre périphérique : deux webcams identiques arrivent sous
@@ -37,6 +38,7 @@
                  [class.busy]="isBusy(d.id)" [attr.aria-busy]="isBusy(d.id)">
           <header class="device-head">
             <h2>{{ d.label }}</h2>
+            @if (d.kind === 'speaker') { <span class="badge badge-blue" data-test="device-kind">Haut-parleur</span> }
             <span [class]="'badge ' + stateClass[d.state]" data-test="device-state">
               {{ stateLabel[d.state] }}
             </span>
@@ -50,6 +52,14 @@
             <p class="note">Absent de la dernière liste du serveur média.</p>
           }
 
+          @if (d.kind === 'speaker') {
+          <dl class="facts">
+            <dt>Modèle</dt><dd>{{ d.model || '—' }}</dd>
+            <dt>Identifiant</dt><dd class="mono">{{ d.id }}</dd>
+            <dt>Usage</dt><dd>Parler en direct (droit « Parler ») ; rien n’est enregistré ni écouté</dd>
+            <dt>Droits accordés</dt><dd>{{ d.grants }}</dd>
+          </dl>
+          } @else {
           <dl class="facts">
             <dt>Modèle</dt><dd>{{ d.model || '—' }}</dd>
             <dt>Identifiant</dt><dd class="mono">{{ d.id }}</dd>
@@ -62,6 +72,7 @@
             <dt>Dernier branchement</dt><dd>{{ d.connected ? 'branché' : fmt(d.last_seen) }}</dd>
             <dt>Droits accordés</dt><dd>{{ d.grants }}</dd>
           </dl>
+          }
 
           <form class="rename" (submit)="rename(d, $event)" data-test="rename-form">
             <div class="form-group">
@@ -79,7 +90,9 @@
           }
 
           <div class="actions">
-            @if (d.state === 'legacy') {
+            @if (d.kind === 'speaker') {
+              <span class="note">Un haut-parleur ne s’enregistre jamais.</span>
+            } @else if (d.state === 'legacy') {
               <span class="note">L’ancienne webcam n’enregistre plus ; ses enregistrements restent
                 consultables jusqu’à leur expiration.</span>
             } @else {

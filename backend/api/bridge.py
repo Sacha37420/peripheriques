@@ -18,6 +18,10 @@ Règles tenues ici :
   * on ne journalise que `viewer_email`, `model_email` et le nombre de périphériques — jamais
     la clé ni le ticket.
 
+Contrat haut-parleur v1 (I4, I5) : la réponse gagne `speakers` (toujours présente, `[]` si
+aucun) — les haut-parleurs où le modèle a le droit « Parler » ; le même ticket sert aussi à
+PUBLIER (WHIP) sur leur chemin `talk`, le hook revérifiant le droit « Parler » du modèle.
+
 Ticket (I2) : `pt1.` + `django.core.signing.dumps` (SECRET_KEY, sel propre) de
 `{"m": model, "v": viewer, "exp": epoch}` — 120 s pour OUVRIR des sessions WebRTC.
 """
@@ -121,7 +125,8 @@ def _email(value) -> str | None:
 def model_devices(model_email: str) -> list[dict]:
     """Périphériques où le modèle a au moins la vidéo, triés par nom d'affichage (I1)."""
     out = []
-    for device in sorted(Device.objects.all(), key=lambda d: (d.label.casefold(), d.slug)):
+    for device in sorted(Device.objects.filter(kind='webcam'),
+                         key=lambda d: (d.label.casefold(), d.slug)):
         rights = rights_for(model_email, device)
         if not device.path_video or not kind_allowed(rights, 'video'):
             continue
@@ -133,6 +138,23 @@ def model_devices(model_email: str) -> list[dict]:
             'connected': device.connected,
             'state': device.state,
             'paths': {'video': device.path_video, 'av': av},
+        })
+    return out
+
+
+def model_speakers(model_email: str) -> list[dict]:
+    """Haut-parleurs où le modèle a le droit « Parler », triés par nom d'affichage (I4)."""
+    out = []
+    for device in sorted(Device.objects.filter(kind='speaker').exclude(path_talk=''),
+                         key=lambda d: (d.label.casefold(), d.slug)):
+        if not kind_allowed(rights_for(model_email, device), 'talk'):
+            continue
+        out.append({
+            'id': device.slug,
+            'label': device.label,
+            'connected': device.connected,
+            'state': device.state,
+            'paths': {'talk': device.path_talk},
         })
     return out
 
@@ -158,7 +180,9 @@ def model_cameras(request):
     # 3. Inventaire relu au plus une fois par DEVICE_SYNC_TTL_S ; injoignable ⇒ dernier état connu.
     inventory.sync()
     devices = model_devices(model)
-    ticket, expires_at = issue_ticket(model, viewer) if devices else (None, None)
-    log.info('Pont : %s demande les caméras de %s — %d périphérique(s)', viewer, model, len(devices))
-    return JsonResponse({'model_email': model, 'devices': devices,
+    speakers = model_speakers(model)
+    ticket, expires_at = issue_ticket(model, viewer) if (devices or speakers) else (None, None)
+    log.info('Pont : %s demande les caméras de %s — %d périphérique(s), %d haut-parleur(s)',
+             viewer, model, len(devices), len(speakers))
+    return JsonResponse({'model_email': model, 'devices': devices, 'speakers': speakers,
                          'ticket': ticket, 'expires_at': iso(expires_at)})

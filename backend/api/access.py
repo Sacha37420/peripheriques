@@ -2,9 +2,11 @@
 la relecture (I3) et la décision de kick (I4).
 
 Vocabulaire :
-  capacité (cap) : 'video' | 'audio' — ce qu'un Grant accorde ;
-  kind           : 'video' | 'audio' | 'av' — rôle d'un chemin MediaMTX parmi ceux que
-                   I1 donne au périphérique (jamais déduit en découpant le chemin) ;
+  capacité (cap) : 'video' | 'audio' | 'speaker' — ce qu'un Grant accorde ('speaker' =
+                   « Parler », publier sa voix sur un haut-parleur ; contrat haut-parleur) ;
+  kind           : 'video' | 'audio' | 'av' | 'talk' — rôle d'un chemin MediaMTX parmi ceux
+                   que I1 donne au périphérique (jamais déduit en découpant le chemin) ;
+                   'talk' est un chemin de PUBLICATION : jamais lu (le hook le refuse en read) ;
   since          : instant d'octroi d'une capacité, borne basse de la relecture.
 """
 from __future__ import annotations
@@ -14,11 +16,14 @@ from datetime import datetime, timezone
 
 from .models import Device, Grant
 
-CAPS = ('video', 'audio')
+CAPS = ('video', 'audio', 'speaker')
+# Capacités qui portent des pistes enregistrées (relecture). « Parler » n'est jamais enregistré.
+TRACK_CAPS = ('video', 'audio')
 KIND_CAPS: dict[str, frozenset[str]] = {
     'video': frozenset({'video'}),
     'audio': frozenset({'audio'}),
     'av': frozenset({'video', 'audio'}),
+    'talk': frozenset({'speaker'}),
 }
 
 
@@ -63,10 +68,15 @@ def kind_allowed(rights: Rights, kind: str) -> bool:
     return bool(caps) and all(rights[c].allowed for c in caps)
 
 
+def can_view(rights: Rights) -> bool:
+    """Un droit de lecture (vidéo ou micro) — la relecture n'a rien à offrir à « Parler »."""
+    return any(rights[c].allowed for c in TRACK_CAPS)
+
+
 def tracks_at(rights: Rights, instant: datetime) -> list[str]:
     """Pistes relisibles à partir de `instant` (since ≤ instant), ordre stable."""
     return [
-        cap for cap in CAPS
+        cap for cap in TRACK_CAPS
         if rights[cap].allowed and rights[cap].since is not None and rights[cap].since <= instant
     ]
 

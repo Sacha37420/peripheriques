@@ -39,7 +39,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import media_client
-from .access import has_any, iso, parse_iso, rights_for, tracks_at
+from .access import can_view, iso, parse_iso, rights_for, tracks_at
 from .models import Device
 
 log = logging.getLogger(__name__)
@@ -116,7 +116,8 @@ class RecordingListView(APIView):
             return Response({'detail': 'Périphérique inconnu.'}, status=status.HTTP_404_NOT_FOUND)
 
         rights = rights_for(request.user.email, device)
-        if not has_any(rights):
+        # « Parler » seul (haut-parleur) n'ouvre aucune relecture : rien n'y est enregistré.
+        if not can_view(rights) or not device.path_av:
             return Response({'detail': 'Aucun droit sur ce périphérique.'},
                             status=status.HTTP_403_FORBIDDEN)
 
@@ -128,7 +129,8 @@ class RecordingListView(APIView):
                             status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         day_start, day_end = _day_bounds(day)
-        cuts = [r.since for r in rights.values() if r.allowed and r.since is not None]
+        cuts = [rights[c].since for c in ('video', 'audio')
+                if rights[c].allowed and rights[c].since is not None]
         out = []
         for item in ranges:
             try:

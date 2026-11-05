@@ -4,6 +4,8 @@
   gap: var(--space-4);
 }
 
+.speakers { margin-bottom: var(--space-4); }
+
 .device { display: flex; flex-direction: column; gap: var(--space-3); }
 
 .device-head {

@@ -1,15 +1,20 @@
-"""Hook de lecture de l'app (lab-media/API.md §2).
+"""Hook de l'app (lab-media/API.md §2).
 
-lab-media relaie ici CHAQUE demande de lecture d'un chemin `webcam/*` : le JSON
-de MediaMTX {ip, user, password, token, action, path, protocol, id, query,
-userAgent}, tel quel. 200 = autorisé, toute autre réponse = refusé ; le corps
-est toujours vide.
+lab-media relaie ici CHAQUE demande de lecture d'un chemin `webcam/*`, et chaque
+demande de publication WebRTC (WHIP) d'un chemin `speaker/*` (contrat haut-parleur,
+I2) : le JSON de MediaMTX {ip, user, password, token, action, path, protocol, id,
+query, userAgent}, tel quel. 200 = autorisé, toute autre réponse = refusé ; le
+corps est toujours vide.
 
-Seule l'action `read` existe encore de ce côté : la publication, l'API, la
-relecture et les métriques de MediaMTX sont tranchées par lab-media-auth et ne
-parviennent plus à l'app. Toute autre action est donc REFUSÉE ici, y compris
-avec les anciens identifiants de publication ou internes — cet endpoint ne doit
-plus jamais pouvoir autoriser autre chose qu'une lecture.
+Deux actions seulement sont jamais autorisées ici :
+  * `read` d'un chemin de lecture connu (av/video/audio) — jamais d'un chemin `talk` :
+    personne n'écoute ce qui est dit dans un haut-parleur ;
+  * `publish` en WebRTC d'un chemin `talk` connu d'un haut-parleur, par jeton Keycloak
+    (coupure inactive + droit « Parler ») ou par ticket du pont (droit « Parler » du
+    modèle, coupure non consultée).
+Toute autre action (api, playback, metrics, publication d'un autre chemin ou par un
+autre protocole…) est REFUSÉE, y compris avec les anciens identifiants de
+publication ou internes.
 
 L'URL est routée publiquement par Caddy (/peripheriques-api/api/media-auth/) et
 joignable par toute app de dev-net : sans `?key=` correcte, rien ne doit
@@ -69,27 +74,39 @@ def media_auth(request):
     if not isinstance(body, dict):
         return _deny()
 
-    # 2. Lecture seulement. Toute autre action (publish, api, playback, metrics,
-    #    pprof, inconnue) est refusée : elle n'a plus rien à faire ici.
-    if body.get('action') != 'read':
-        return _deny()
+    # 2. Lecture, ou prise de parole sur un haut-parleur. Toute autre action (api,
+    #    playback, metrics, pprof, inconnue) est refusée : elle n'a rien à faire ici.
+    action = body.get('action')
+    if action == 'read':
+        # 3. Périphérique retrouvé par ses chemins connus (I2), puis JWT validé
+        #    exactement comme l'API REST, puis droit sur ce chemin.
+        return _read(body, body.get('path'))
+    if action == 'publish':
+        return _publish(body, body.get('path'))
+    return _deny()
 
-    # 3. Périphérique retrouvé par ses chemins connus (I2), puis JWT validé
-    #    exactement comme l'API REST, puis droit sur ce chemin.
-    return _read(body, body.get('path'))
 
-
-def _read(body: dict, path) -> HttpResponse:
+def _target(body: dict, path):
+    """(device, kind, path normalisé, token) ; device None si le chemin est inconnu ou si le
+    jeton n'est pas une chaîne."""
     if isinstance(path, str) and path.startswith('/'):
         path = path[1:]
     device, kind = Device.by_path(path)
-    if device is None:
-        return _deny()
     token = body.get('token') or ''
-    if not isinstance(token, str):
-        return _deny()
+    if device is None or not isinstance(token, str):
+        return None, None, path, ''
     if token.startswith('Bearer '):
         token = token[7:]
+    return device, kind, path, token
+
+
+def _read(body: dict, path) -> HttpResponse:
+    device, kind, path, token = _target(body, path)
+    if device is None:
+        return _deny()
+    # Un chemin de prise de parole ne se lit jamais, ni par jeton ni par ticket.
+    if kind == 'talk' or kind is None:
+        return _deny()
 
     # Ticket du pont (I2) — reconnu à son préfixe AVANT toute validation de JWT. La coupure
     # (I0) n'est pas consultée sur ce chemin.
@@ -135,6 +152,50 @@ def _read_ticket(body: dict, token: str, device: Device, kind: str, path: str) -
     if not _remember(session_id, model_email, path, 'webrtc', viewer_email=viewer_email):
         return _deny()
     log.info('Lecture par le pont : %s regarde %s (droits de %s)', viewer_email, path, model_email)
+    return _allow()
+
+
+def _publish(body: dict, path) -> HttpResponse:
+    """Prise de parole (contrat haut-parleur, I2/I5) : WHIP sur le chemin `talk` d'un
+    haut-parleur connu. Jamais une autre publication.
+
+    La session est gardée (sans quoi la révocation du droit « Parler » ne saurait pas la
+    retrouver) ; une session qu'on ne peut pas garder est refusée — par jeton comme par
+    ticket. Un second publieur sur un chemin occupé est refusé par MediaMTX lui-même
+    (`overridePublisher: no`) : sa ligne, sans session réelle, est purgée par l'expulsion."""
+    device, kind, path, token = _target(body, path)
+    if device is None or kind != 'talk' or not device.is_speaker:
+        return _deny()
+    if body.get('protocol') != 'webrtc':
+        return _deny()
+    session_id = body.get('id')
+    if not (isinstance(session_id, str) and session_id):
+        return _deny()
+
+    if bridge.is_ticket(token):
+        claims = bridge.read_ticket(token)
+        if claims is None:
+            return _deny()
+        model_email, viewer_email = claims
+        if not kind_allowed(rights_for(model_email, device), 'talk'):
+            return _deny()
+        if not _remember(session_id, model_email, path, 'webrtc', viewer_email=viewer_email):
+            return _deny()
+        log.info('Parole par le pont : %s parle sur %s (droits de %s)',
+                 viewer_email, path, model_email)
+        return _allow()
+
+    if Cutoff.is_active():
+        return _deny()
+    try:
+        user = validate_token(token)
+    except AuthenticationFailed:
+        return _deny()
+    if not kind_allowed(rights_for(user.email, device), 'talk'):
+        return _deny()
+    if not _remember(session_id, user.email, path, 'webrtc'):
+        return _deny()
+    log.info('Parole : %s parle sur %s', user.email, path)
     return _allow()
 
 

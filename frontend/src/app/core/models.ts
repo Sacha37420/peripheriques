@@ -22,26 +22,37 @@ export interface StreamPaths {
   av: string | null;
   video: string | null;
   audio: string | null;
+  /** Haut-parleur : chemin où PUBLIER sa voix (WHIP) ; jamais lu. null pour une webcam. */
+  talk: string | null;
 }
+
+/** Sorte de périphérique (contrat haut-parleur, I1). */
+export type DeviceKind = 'webcam' | 'speaker';
 
 export interface Device {
   /** Identifiant I0 (ex. « usb-32e4-9230-p3-4 », « webcam-ancienne »). */
   slug: string;
+  kind: DeviceKind;
   /** Nom d'affichage — texte brut, toujours rendu par interpolation. */
   label: string;
+  state: DeviceState;
   online: boolean;
   has_audio: boolean;
   paths: StreamPaths;
   video: Capability;
   audio: Capability;
+  /** « Parler » : publier sa voix sur un haut-parleur. */
+  speaker: Capability;
 }
 
-/** État d'inventaire (I1) ; '' = état inconnu. */
-export type DeviceState = 'live' | 'waiting' | 'starting' | 'error' | 'offline' | 'legacy' | '';
+/** État d'inventaire (I1) ; '' = état inconnu. idle/talking : haut-parleur. */
+export type DeviceState =
+  'live' | 'waiting' | 'starting' | 'error' | 'offline' | 'legacy' | 'idle' | 'talking' | '';
 
 /** GET /api/grants/devices/ (admin) : tous les périphériques, pour la gestion des droits uniquement. */
 export interface GrantDevice {
   slug: string;
+  kind: DeviceKind;
   label: string;
   online: boolean;
   has_audio: boolean;
@@ -52,6 +63,7 @@ export interface GrantDevice {
 /** GET /api/admin/devices/ (admins des droits) : un périphérique déjà vu, branché ou non. */
 export interface AdminDevice {
   id: string;
+  kind: DeviceKind;
   label: string;
   model: string;
   vendor_id: string;
@@ -89,6 +101,8 @@ export const STATE_LABEL: Record<DeviceState, string> = {
   error: 'En erreur',
   offline: 'Débranché',
   legacy: 'Ancienne webcam',
+  idle: 'Prêt',
+  talking: 'Quelqu’un parle',
   '': 'État inconnu',
 };
 
@@ -98,8 +112,10 @@ export interface Grant {
   device: string;
   video: boolean;
   audio: boolean;
+  speaker: boolean;
   video_since: string | null;
   audio_since: string | null;
+  speaker_since: string | null;
   granted_by: string;
   updated_at: string;
 }
@@ -109,11 +125,13 @@ export interface GrantCreate {
   device: string;
   video: boolean;
   audio: boolean;
+  speaker: boolean;
 }
 
 export interface GrantPatch {
   video?: boolean;
   audio?: boolean;
+  speaker?: boolean;
 }
 
 export type Track = 'video' | 'audio';
@@ -142,6 +160,7 @@ export type StreamKind = 'av' | 'video' | 'audio';
 
 /** av si vidéo+audio, video ou audio sinon, null si aucun droit (I6). */
 export function streamKind(d: Device): StreamKind | null {
+  if (d.kind === 'speaker') return null;
   if (d.video.allowed && d.audio.allowed && d.paths.audio) return 'av';
   if (d.video.allowed) return 'video';
   if (d.audio.allowed && d.paths.audio) return 'audio';

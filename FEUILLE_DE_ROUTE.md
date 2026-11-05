@@ -124,3 +124,41 @@ jetable, nouveaux tests rejoués aussi sur PostgreSQL (98 OK) ; cinq mutations d
 (protocole, coupure au hook, épargne du pont, clé vide, échéance) chacune détectée par un test ;
 `npm run build` vert. Non vérifié : lab-media et MediaMTX réels (le ticket dans l'en-tête WHEP),
 navigateur réel, appel réel depuis google-agenda.
+
+## Lot 6 — Haut-parleur : droit « Parler » et prise de parole en direct   ·   statut : en cours
+**Objectif :** depuis la page Direct (et depuis google-agenda de dev2 pour les watchers d'un
+modèle), un bouton « Parler » envoie la voix du navigateur dans le haut-parleur branché sur la
+prise jack de l'hôte, si un administrateur des droits l'a accordé — comme pour les webcams.
+Une seule personne parle à la fois, rien n'est enregistré, personne n'écoute.
+Chantier `chantiers/haut-parleur` (contrat v1 : I1 inventaire `kind: speaker` / `paths.talk`,
+I2 publication WHIP relayée au hook, I3 expulsion d'un publieur, I4 pont + `speakers`, I5 ticket).
+**Tâches :**
+- [x] Migration 0008 (additive) : `Device.kind`, `Device.path_talk`, `Grant.speaker`, `Grant.speaker_since`
+- [x] Inventaire : objets `kind: speaker` (identifiant hors `usb-`/`webcam…`, aucun chemin de lecture,
+  `paths.talk` sous `speaker/`, jamais enregistré) ; webcam portant un `talk` ou sorte inconnue ignorée ;
+  `talk` déjà porté par un autre périphérique ignoré
+- [x] Droits : capacité `speaker` (« Parler ») seule admise sur un haut-parleur (vidéo/micro → 400),
+  refusée sur une webcam (400) ; `PATCH record` sur un haut-parleur → 409 ; « Parler » n'ouvre
+  aucune relecture
+- [x] Hook `publish` : chemin `talk` d'un haut-parleur connu, WebRTC seulement, id de session requis ;
+  jeton Keycloak (coupure inactive + droit « Parler ») ou ticket `pt1.` (droit « Parler » du modèle,
+  coupure non consultée) ; session gardée sinon refus ; `read` d'un chemin `talk` toujours refusé
+- [x] Coupure : expulse aussi les publieurs WebRTC des chemins `talk` (liste de lab-media), sauf ceux
+  du pont ; jamais une publication de capture. Révocation / oubli : expulsion par `kick_revoked`/`kick_paths`
+- [x] Pont : clé `speakers` toujours présente (triée par nom), ticket émis si `devices` ou `speakers`
+- [x] Frontend : bouton « Parler » (WHIP, jeton Keycloak, clic/clic, « Vous parlez », « Quelqu’un parle
+  déjà », « Coupé », arrêt à la sortie de page) ; haut-parleur dans Droits (colonne Parler) et Périphériques
+- [ ] Mise en service (après lab-media) et essai audible avec le propriétaire (architecte)
+**Tests à passer avant de clore le lot :**
+- [x] `python manage.py test --settings=config.settings_test` (dont `api.tests.test_haut_parleur`)
+- [x] `npm run build`
+- [ ] Après mise en service : un membre avec « Parler » est entendu ; sans droit / pendant la coupure,
+  refusé ; un second « Parler » simultané affiche « Quelqu’un parle déjà » ; retirer le droit coupe la
+  parole ; un watcher google-agenda parle pendant la coupure si le modèle a le droit
+**Vérifié le :** 2026-11-05 — non déployé. `essai.sh peripheriques` : 235 tests OK (39 nouveaux,
+8 assertions de forme existantes étendues des seules nouvelles clés) ; `makemigrations --check`
+sans écart ; 0008 jouée avant/arrière/avant sur PostgreSQL jetable ; sept mutations des contrôles
+(protocole, coupure, lecture du `talk`, publication hors `talk`, expulsion des publieurs, ticket
+haut-parleur seul, « Parler » sur webcam) chacune détectée ; `npm run build` vert. Non vérifié :
+lab-media et MediaMTX réels (relais `publish`, code exact du refus « déjà un publieur »), navigateur
+réel (micro, WHIP), son réel.

@@ -16,9 +16,15 @@ class Device(models.Model):
     Tout le reste est le dernier état connu de l'inventaire (`api.inventory`).
     """
 
-    STATES = ('live', 'waiting', 'starting', 'error', 'offline', 'legacy')
+    STATES = ('live', 'waiting', 'starting', 'error', 'offline', 'legacy',
+              # haut-parleur (contrat haut-parleur, I1) : prêt / quelqu'un parle
+              'idle', 'talking')
+    KINDS = ('webcam', 'speaker')
 
     slug = models.SlugField(primary_key=True, max_length=64)
+    # `webcam` (chemins de lecture av/video/audio) ou `speaker` (un seul chemin de
+    # publication, `path_talk` ; contrat haut-parleur, I1). Donné par lab-media.
+    kind = models.CharField(max_length=10, default='webcam')
     label = models.CharField(max_length=100)
     model = models.CharField(max_length=100, blank=True, default='')
     vendor_id = models.CharField(max_length=4, blank=True, default='')
@@ -35,6 +41,9 @@ class Device(models.Model):
     path_av = models.CharField(max_length=120, blank=True, default='')
     path_video = models.CharField(max_length=120, blank=True, default='')
     path_audio = models.CharField(max_length=120, blank=True, default='')
+    # Chemin de prise de parole d'un haut-parleur (`paths.talk` d'I1) : on y PUBLIE, personne
+    # ne le lit jamais. Vide pour une webcam.
+    path_talk = models.CharField(max_length=120, blank=True, default='')
     # Faux quand la dernière lecture réussie de l'inventaire ne le contenait plus.
     listed = models.BooleanField(default=True)
 
@@ -61,13 +70,17 @@ class Device(models.Model):
             qs = qs.exclude(slug=exclude)
         return qs.exists()
 
+    @property
+    def is_speaker(self) -> bool:
+        return self.kind == 'speaker'
+
     def paths(self) -> dict[str, str | None]:
-        """Chemins connus, par kind ; None si absent (pas de micro)."""
+        """Chemins connus, par kind ; None si absent (pas de micro, pas de haut-parleur)."""
         return {'av': self.path_av or None, 'video': self.path_video or None,
-                'audio': self.path_audio or None}
+                'audio': self.path_audio or None, 'talk': self.path_talk or None}
 
     def kind_of(self, path: str) -> str | None:
-        """Kind ('av' | 'video' | 'audio') du chemin `path` pour CE périphérique."""
+        """Kind ('av' | 'video' | 'audio' | 'talk') du chemin `path` pour CE périphérique."""
         for kind, known in self.paths().items():
             if known and known == path:
                 return kind
@@ -80,7 +93,8 @@ class Device(models.Model):
         if not isinstance(path, str) or not path:
             return None, None
         found = list(cls.objects.filter(
-            models.Q(path_av=path) | models.Q(path_video=path) | models.Q(path_audio=path))[:2])
+            models.Q(path_av=path) | models.Q(path_video=path) | models.Q(path_audio=path)
+            | models.Q(path_talk=path))[:2])
         if len(found) != 1:
             return None, None
         return found[0], found[0].kind_of(path)
@@ -100,6 +114,10 @@ class Grant(models.Model):
     audio = models.BooleanField(default=False)
     video_since = models.DateTimeField(null=True, blank=True)
     audio_since = models.DateTimeField(null=True, blank=True)
+    # « Parler » (contrat haut-parleur) : publier sa voix sur un haut-parleur. N'existe que sur
+    # un haut-parleur, où c'est la seule capacité admise (et inversement sur une webcam).
+    speaker = models.BooleanField(default=False)
+    speaker_since = models.DateTimeField(null=True, blank=True)
     granted_by = models.EmailField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -116,8 +134,8 @@ class Grant(models.Model):
 
 
 class MediaSession(models.Model):
-    """Lecture en direct autorisée par le hook, gardée pour pouvoir
-    l'expulser (lab-media/API.md §1.2) quand le droit correspondant est retiré.
+    """Lecture en direct — ou prise de parole sur un haut-parleur (chemin `talk`) — autorisée
+    par le hook, gardée pour pouvoir l'expulser (lab-media/API.md §1.2) quand le droit correspondant est retiré.
 
     Purge : une ligne disparaît quand son expulsion réussit, quand une révocation
     la trouve absente des sessions listées par lab-media (session déjà terminée),

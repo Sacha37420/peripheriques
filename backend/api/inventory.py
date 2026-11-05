@@ -39,6 +39,10 @@ from .models import Device
 log = logging.getLogger('api.inventory')
 
 ID_RE = re.compile(r'^usb-[0-9a-f]{4}-[0-9a-f]{4}-[sp][a-z0-9-]{1,40}$')
+# Haut-parleur déclaré au registre de lab-media (contrat haut-parleur, I1) : jamais un
+# identifiant de webcam (`usb-…`, `webcam…`).
+SPEAKER_ID_RE = re.compile(r'^[a-z][a-z0-9-]{1,40}$')
+SPEAKER_STATES = ('idle', 'talking', 'error', 'offline')
 LEGACY_ID = 'webcam-ancienne'
 LEGACY_LABEL = 'Ancienne webcam'
 _CONTROL = re.compile(r'[\x00-\x1f\x7f]')
@@ -103,9 +107,21 @@ def _valid_path(value) -> bool:
     return isinstance(value, str) and 0 < len(value) <= 120 and bool(_PATH_RE.match(value))
 
 
+def _when(item, key) -> datetime | None:
+    try:
+        return parse_iso(item.get(key))
+    except ValueError:
+        return None
+
+
 def _parse(item) -> dict | None:
     """Champs d'un objet I1 validés ; None si l'entrée est inutilisable."""
     if not isinstance(item, dict):
+        return None
+    kind = item.get('kind', 'webcam')          # absent : lab-media d'avant les haut-parleurs
+    if kind == 'speaker':
+        return _parse_speaker(item)
+    if kind != 'webcam':
         return None
     dev_id = item.get('id')
     if not isinstance(dev_id, str) or not (dev_id == LEGACY_ID or ID_RE.match(dev_id)):
@@ -118,18 +134,15 @@ def _parse(item) -> dict | None:
         return None
     if audio is not None and not _valid_path(audio):
         return None
+    if paths.get('talk') is not None:
+        return None                          # une webcam ne reçoit jamais de voix
     if len({av, video, audio} - {None}) != (3 if audio else 2):
         return None                          # deux kinds sur un même chemin : incohérent
-
-    def when(key) -> datetime | None:
-        try:
-            return parse_iso(item.get(key))
-        except ValueError:
-            return None
 
     state = item.get('state')
     return {
         'slug': dev_id,
+        'kind': 'webcam',
         'model': clean_text(item.get('model'), 100),
         'vendor_id': clean_text(item.get('vendor_id'), 4),
         'product_id': clean_text(item.get('product_id'), 4),
@@ -137,14 +150,52 @@ def _parse(item) -> dict | None:
         'usb_port': clean_text(item.get('usb_port'), 64),
         'has_audio': item.get('has_audio') is True and audio is not None,
         'connected': item.get('connected') is True,
-        'state': state if state in Device.STATES else '',
+        'state': state if state in Device.STATES and state not in ('idle', 'talking') else '',
         'error_detail': clean_text(item.get('error_detail'), 300) if state == 'error' else '',
         'record': item.get('record') is True,
-        'first_seen': when('first_seen'),
-        'last_seen': when('last_seen'),
+        'first_seen': _when(item, 'first_seen'),
+        'last_seen': _when(item, 'last_seen'),
         'path_av': av,
         'path_video': video,
         'path_audio': audio or '',
+        'path_talk': '',
+        'listed': True,
+    }
+
+
+def _parse_speaker(item: dict) -> dict | None:
+    """Haut-parleur (I1) : un seul chemin, `paths.talk` ; aucun chemin de lecture ; jamais
+    enregistré ; aucune identité USB."""
+    dev_id = item.get('id')
+    if not isinstance(dev_id, str) or not SPEAKER_ID_RE.match(dev_id) \
+            or dev_id.startswith(('usb-', 'webcam')):
+        return None
+    paths = item.get('paths')
+    if not isinstance(paths, dict):
+        return None
+    if any(paths.get(k) is not None for k in ('av', 'video', 'audio')):
+        return None                          # un haut-parleur ne se lit jamais
+    talk = paths.get('talk')
+    # Garde de cohérence (pas une recomposition) : le préfixe `speaker` est celui que lab-media
+    # ouvre à la publication WHIP (I2) ; un « talk » ailleurs serait une incohérence.
+    if not _valid_path(talk) or not talk.startswith('speaker/'):
+        return None
+    state = item.get('state')
+    state = state if state in SPEAKER_STATES else ''
+    return {
+        'slug': dev_id,
+        'kind': 'speaker',
+        'model': clean_text(item.get('model'), 100),
+        'vendor_id': '', 'product_id': '', 'serial': '', 'usb_port': '',
+        'has_audio': False,
+        'connected': item.get('connected') is True and state != 'offline',
+        'state': state,
+        'error_detail': clean_text(item.get('error_detail'), 300) if state == 'error' else '',
+        'record': False,
+        'first_seen': _when(item, 'first_seen'),
+        'last_seen': _when(item, 'last_seen'),
+        'path_av': '', 'path_video': '', 'path_audio': '',
+        'path_talk': talk,
         'listed': True,
     }
 
@@ -201,10 +252,11 @@ def apply(items) -> None:
             slug = fields.pop('slug')
             if slug in seen:
                 continue
-            own_paths = {fields['path_av'], fields['path_video'], fields['path_audio']} - {''}
+            own_paths = {fields['path_av'], fields['path_video'], fields['path_audio'],
+                         fields['path_talk']} - {''}
             clash = Device.objects.exclude(slug=slug).filter(
                 Q(path_av__in=own_paths) | Q(path_video__in=own_paths)
-                | Q(path_audio__in=own_paths)).exists()
+                | Q(path_audio__in=own_paths) | Q(path_talk__in=own_paths)).exists()
             if clash:
                 log.warning('Inventaire : %s ignoré, un de ses chemins appartient déjà à un autre '
                             'périphérique', slug)

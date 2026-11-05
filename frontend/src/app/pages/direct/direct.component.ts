@@ -4,6 +4,7 @@ import { ApiService } from '../../core/api.service';
 import { Device, StreamKind, apiErrorMessages, streamKind } from '../../core/models';
 import { LivePlayerComponent } from '../../shared/live-player/live-player.component';
 import { NoAccessComponent } from '../../shared/no-access/no-access.component';
+import { TalkButtonComponent } from '../../shared/talk-button/talk-button.component';
 
 interface DirectItem {
   device: Device;
@@ -21,7 +22,7 @@ const KIND_LABEL: Record<StreamKind, string> = {
 @Component({
   selector: 'app-direct',
   standalone: true,
-  imports: [LivePlayerComponent, NoAccessComponent, RouterLink],
+  imports: [LivePlayerComponent, NoAccessComponent, RouterLink, TalkButtonComponent],
   templateUrl: './direct.component.html',
   styleUrl: './direct.component.scss',
 })
@@ -31,6 +32,8 @@ export class DirectComponent implements OnInit {
   readonly loading = signal(true);
   readonly errors = signal<string[]>([]);
   readonly items = signal<DirectItem[]>([]);
+  /** Haut-parleurs où l'utilisateur a le droit « Parler » (contrat haut-parleur). */
+  readonly speakers = signal<Device[]>([]);
   readonly kindLabel = KIND_LABEL;
 
   ngOnInit(): void {
@@ -42,10 +45,11 @@ export class DirectComponent implements OnInit {
     this.errors.set([]);
     this.api.getDevices().subscribe({
       next: devices => {
-        this.items.set(devices.map(device => {
+        this.items.set(devices.filter(d => d.kind !== 'speaker').map(device => {
           const kind = streamKind(device);
           return { device, kind, path: kind ? device.paths[kind] : null };
         }));
+        this.speakers.set(devices.filter(d => d.kind === 'speaker' && d.speaker?.allowed));
         this.loading.set(false);
       },
       error: err => {

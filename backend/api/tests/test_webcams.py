@@ -83,13 +83,13 @@ class InventorySyncTests(WebcamCase):
         self.assertEqual(r.status_code, 200)
         by_slug = {d['slug']: d for d in r.json()}
         self.assertEqual(set(by_slug), {'webcam-ancienne', CAM})
-        self.assertEqual(by_slug[CAM], {'slug': CAM, 'label': 'HD USB Camera', 'online': True,
+        self.assertEqual(by_slug[CAM], {'slug': CAM, 'kind': 'webcam', 'label': 'HD USB Camera', 'online': True,
                                         'has_audio': False, 'state': 'live', 'connected': True})
         d = Device.objects.get(slug=CAM)
         self.assertEqual((d.model, d.vendor_id, d.product_id, d.usb_port, d.serial),
                          ('HD USB Camera', '32e4', '9230', '3-4', ''))
         self.assertEqual(d.paths(), {'av': f'webcam/{CAM}/av', 'video': f'webcam/{CAM}/video',
-                                     'audio': None})
+                                     'audio': None, 'talk': None})
         self.assertEqual(d.first_seen, utc(2026, 10, 16, 22, 21, 4))
         # « online » vient de l'état réel du chemin av donné par I1
         self.assertIn(('GET', f'/v1/paths/webcam/{CAM}/av', {}, True), self.fake.calls)
@@ -106,12 +106,13 @@ class InventorySyncTests(WebcamCase):
         self.assertEqual([d['id'] for d in body['items']], ['webcam-ancienne', CAM, MIC_CAM])
         cam = body['items'][1]
         self.assertEqual(cam, {
-            'id': CAM, 'label': 'HD USB Camera', 'model': 'HD USB Camera',
+            'id': CAM, 'kind': 'webcam', 'label': 'HD USB Camera', 'model': 'HD USB Camera',
             'vendor_id': '32e4', 'product_id': '9230', 'serial': '', 'usb_port': '3-4',
             'has_audio': False, 'connected': True, 'state': 'live', 'error_detail': '',
             'record': False, 'first_seen': '2026-10-16T22:21:04Z',
             'last_seen': '2026-10-17T07:12:40Z',
-            'paths': {'av': f'webcam/{CAM}/av', 'video': f'webcam/{CAM}/video', 'audio': None},
+            'paths': {'av': f'webcam/{CAM}/av', 'video': f'webcam/{CAM}/video', 'audio': None,
+                      'talk': None},
             'listed': True, 'grants': 0,
         })
         mic = body['items'][2]
@@ -395,7 +396,7 @@ class PathTests(WebcamCase):
         self.assertEqual(len(d), 1)
         self.assertEqual(d[0]['paths'], {'av': f'webcam/{MIC_CAM}/av',
                                          'video': f'webcam/{MIC_CAM}/video',
-                                         'audio': f'webcam/{MIC_CAM}/audio'})
+                                         'audio': f'webcam/{MIC_CAM}/audio', 'talk': None})
         self.assertEqual((d[0]['label'], d[0]['has_audio'], d[0]['online']),
                          ('HD USB Camera', True, True))
 

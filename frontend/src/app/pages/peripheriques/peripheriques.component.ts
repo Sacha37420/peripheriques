@@ -14,6 +14,8 @@ const STATE_CLASS: Record<DeviceState, string> = {
   error: 'badge-red',
   offline: 'badge-gray',
   legacy: 'badge-gray',
+  idle: 'badge-green',
+  talking: 'badge-blue',
   '': 'badge-gray',
 };
 

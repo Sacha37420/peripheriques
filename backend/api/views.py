@@ -41,14 +41,18 @@ def devices_in_order():
 
 
 def _online(device: Device) -> bool:
+    if device.is_speaker:
+        # Haut-parleur : pas de chemin à interroger (rien n'y est publié tant que personne ne
+        # parle) — c'est l'état de son lecteur dans l'inventaire (I1) qui fait foi.
+        return device.connected and device.state in ('idle', 'talking')
     return bool(device.path_av) and media_client.path_ready(device.path_av)
 
 
 class DeviceListView(APIView):
     """GET /api/devices/ — périphériques visibles et droits de l'appelant.
 
-    `paths` : chemins de lecture donnés par lab-media (I1) — le frontend les utilise
-    tels quels, sans jamais les recomposer."""
+    `paths` : chemins donnés par lab-media (I1) — le frontend les utilise tels quels, sans
+    jamais les recomposer ; `paths.talk` (haut-parleur) est le chemin où PUBLIER (WHIP)."""
 
     def get(self, request):
         inventory.sync()
@@ -61,7 +65,9 @@ class DeviceListView(APIView):
                 continue
             out.append({
                 'slug': device.slug,
+                'kind': device.kind,
                 'label': device.label,
+                'state': device.state,
                 'online': _online(device),
                 'has_audio': device.has_audio,
                 'paths': device.paths(),
@@ -88,7 +94,7 @@ class GrantViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
         Route de liste : le SimpleRouter la déclare avant `grants/<pk>/`."""
         inventory.sync()
         return Response([
-            {'slug': d.slug, 'label': d.label, 'online': _online(d),
+            {'slug': d.slug, 'kind': d.kind, 'label': d.label, 'online': _online(d),
              'has_audio': d.has_audio, 'state': d.state, 'connected': d.connected}
             for d in devices_in_order()
         ])
@@ -115,6 +121,7 @@ class GrantViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
             granted_by=self.request.user.email,
             video_since=now if data.get('video') else None,
             audio_since=now if data.get('audio') else None,
+            speaker_since=now if data.get('speaker') else None,
         )
 
     def partial_update(self, request, *args, **kwargs):
@@ -182,6 +189,7 @@ LABEL_ERROR = "Nom d'affichage : de 1 à 60 caractères, sur une seule ligne."
 LABEL_TAKEN = "Ce nom est déjà porté par un autre périphérique : choisissez-en un autre."
 MEDIA_DOWN = 'Serveur média indisponible.'
 MEDIA_ODD = 'Réponse inattendue du serveur média.'
+NOT_RECORDABLE = "Un haut-parleur ne s'enregistre jamais."
 CUTOFF_HOLDS = ("Le direct et les enregistrements sont coupés : l'enregistrement ne peut pas "
                 "être activé avant leur rétablissement (page Droits).")
 
@@ -193,6 +201,7 @@ class _CutoffHolds(Exception):
 def admin_device(device: Device, grants: int | None = None) -> dict:
     return {
         'id': device.slug,
+        'kind': device.kind,
         'label': device.label,
         'model': device.model,
         'vendor_id': device.vendor_id,
@@ -267,6 +276,8 @@ class AdminDeviceView(APIView):
                 return Response({'label': [LABEL_TAKEN]}, status=400)
         if 'record' in body and not isinstance(body['record'], bool):
             return Response({'record': ['Vrai ou faux attendu.']}, status=400)
+        if 'record' in body and device.is_speaker:
+            return Response({'record': [NOT_RECORDABLE]}, status=409)
 
         if 'record' in body:
             try:

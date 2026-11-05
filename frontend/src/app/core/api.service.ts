@@ -109,6 +109,11 @@ export class ApiService {
     return `${this.origin}/lab-media-webrtc/${encodePath(path)}/whep`;
   }
 
+  /** Prise de parole sur un haut-parleur (contrat haut-parleur, I2) : `path` = paths.talk. */
+  whipUrl(path: string): string {
+    return `${this.origin}/lab-media-webrtc/${encodePath(path)}/whip`;
+  }
+
   hlsUrl(path: string): string {
     return `${this.origin}/lab-media-hls/${encodePath(path)}/index.m3u8`;
   }

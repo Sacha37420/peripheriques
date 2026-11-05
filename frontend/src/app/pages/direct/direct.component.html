@@ -2,7 +2,8 @@
   <header class="page-header">
     <div>
       <h1>Direct</h1>
-      <p class="subtitle">Vidéo et son en temps réel des périphériques auxquels vous avez accès.</p>
+      <p class="subtitle">Vidéo et son en temps réel des périphériques auxquels vous avez accès ;
+        prise de parole sur les haut-parleurs où vous y êtes autorisé.</p>
     </div>
     <button type="button" class="btn btn-ghost" (click)="load()" [disabled]="loading()">Actualiser</button>
   </header>
@@ -13,9 +14,31 @@
     <div class="card" role="alert">
       @for (msg of errors(); track $index) { <p class="error-msg">{{ msg }}</p> }
     </div>
-  } @else if (!items().length) {
+  } @else if (!items().length && !speakers().length) {
     <app-no-access />
   } @else {
+    @if (speakers().length) {
+      <div class="grid speakers">
+        @for (sp of speakers(); track sp.slug) {
+          <article class="card device" data-test="speaker" [attr.data-device]="sp.slug">
+            <header class="device-head">
+              <h2>{{ sp.label }}</h2>
+              <span class="badge badge-blue">Haut-parleur</span>
+              @if (sp.online) {
+                <span class="badge badge-green">Disponible</span>
+              } @else {
+                <span class="badge badge-gray">Indisponible</span>
+              }
+            </header>
+            @if (sp.paths.talk && sp.online) {
+              <app-talk-button [path]="sp.paths.talk" [othersTalking]="sp.state === 'talking'" />
+            } @else {
+              <p class="offline">Le haut-parleur n’est pas disponible pour le moment.</p>
+            }
+          </article>
+        }
+      </div>
+    }
     <div class="grid">
       @for (item of items(); track item.device.slug) {
         <article class="card device" [attr.data-device]="item.device.slug">

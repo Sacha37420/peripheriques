@@ -4,7 +4,7 @@ import { ApiService } from '../../core/api.service';
 import { CutoffState, Grant, GrantDevice, GrantPatch, apiErrorMessages } from '../../core/models';
 import { fmtDateTime } from '../../core/paris-time';
 
-type Cap = 'video' | 'audio';
+type Cap = 'video' | 'audio' | 'speaker';
 
 @Component({
   selector: 'app-grants',
@@ -26,8 +26,13 @@ export class GrantsComponent implements OnInit {
   private readonly deviceMics = computed(
     () => new Map(this.devices().map(d => [d.slug, d.has_audio] as const)),
   );
+  private readonly deviceSpeakers = computed(
+    () => new Map(this.devices().map(d => [d.slug, d.kind === 'speaker'] as const)),
+  );
   /** Le périphérique choisi dans le formulaire a-t-il un micro ? (sinon : vidéo seule) */
   readonly selectedHasMic = computed(() => this.hasMic(this.device()));
+  /** Le périphérique choisi est-il un haut-parleur ? (seul le droit « Parler » s'y accorde) */
+  readonly selectedIsSpeaker = computed(() => this.isSpeaker(this.device()));
 
   // ── État par ligne ──
   readonly busy = signal<ReadonlySet<number>>(new Set());
@@ -91,6 +96,11 @@ export class GrantsComponent implements OnInit {
     return this.deviceMics().get(slug) ?? true;
   }
 
+  /** Inconnu ⇒ faux : l'API reste juge (400 sur une capacité croisée). */
+  isSpeaker(slug: string): boolean {
+    return this.deviceSpeakers().get(slug) ?? false;
+  }
+
   selectDevice(slug: string): void {
     this.device.set(slug);
     if (!this.hasMic(slug)) this.audio.set(false);
@@ -115,11 +125,13 @@ export class GrantsComponent implements OnInit {
     this.submitting.set(true);
     this.formErrors.set([]);
     this.formSuccess.set('');
+    const speaker = this.selectedIsSpeaker();
     this.api.createGrant({
       email: this.email().trim(),
       device: this.device(),
-      video: this.video(),
-      audio: this.audio() && this.selectedHasMic(),
+      video: !speaker && this.video(),
+      audio: !speaker && this.audio() && this.selectedHasMic(),
+      speaker,
     }).subscribe({
       next: g => {
         this.upsert(g);
@@ -145,7 +157,7 @@ export class GrantsComponent implements OnInit {
       input.checked = previous;
       return;
     }
-    const patch: GrantPatch = cap === 'video' ? { video: next } : { audio: next };
+    const patch: GrantPatch = { [cap]: next };
     this.setBusy(g.id, true);
     this.setRowErrors(g.id, []);
     this.api.updateGrant(g.id, patch).subscribe({
