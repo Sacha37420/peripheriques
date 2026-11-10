@@ -28,18 +28,21 @@ Chantier `chantiers/webcams` (contrat v1, interfaces I0, I1, I2 servies par lab-
 - [x] Noms d'affichage uniques (casse et espaces de bord ignorés) : à l'arrivée « Modèle 2 »,
   « Modèle 3 »… (ordre `first_seen` puis identifiant) ; renommage vers un nom pris refusé (400) ;
   index unique `lower(trim(label))` (migrations 0005 dédoublonnage, 0006 contrainte)
-- [ ] Mise en service et essai sur la vraie caméra, une fois lab-media livré (architecte)
+- [x] Mise en service et essai sur la vraie caméra, une fois lab-media livré (architecte) — mis en service le 2026-10-17 (voir « Vérifié le »)
 **Tests à passer avant de clore le lot :**
 - [x] `python manage.py test --settings=config.settings_test` (dont `api.tests.test_webcams`)
 - [x] `npm run build`
 - [ ] Après mise en service : la HD USB Camera (`usb-32e4-9230-p3-4`) apparaît, se renomme, se
   lit en direct avec un droit Vidéo ; un membre non admin reçoit 403 sur `/api/admin/devices/`
-**Vérifié le :** 2026-10-17 — `essai.sh peripheriques` (PostgreSQL jetable) : 163 tests OK, dont **Mis en service le 2026-10-17** (après lab-media) : image construite pendant que l'ancienne tournait, `scripts/app-test.sh peripheriques` vert, migrations 0003 à 0006 jouées, les deux droits gardés sur « Ancienne webcam ». En navigateur réel (`e2e_member`) : les deux HD USB Camera détectées sous « HD USB Camera » et « HD USB Camera 2 », renommage vers un nom pris refusé (400), renommage libre accepté, droit Micro absent et refusé (400) sur une webcam sans micro, droit Vidéo accordé puis lecture autorisée par le hook (WebRTC et HLS), enregistrement activé → segment écrit, puis coupé. Image du direct non vue : le Chromium du runner ne décode pas le H.264.
-ceux de `api.tests.test_webcams` (faux lab-media rejouant les réponses I1 du contrat, noms uniques,
+  — 2026-11-08 : apparition, renommage et lecture autorisée par le hook vérifiés le 2026-10-17 ;
+  restent l'image du direct (H.264, vrai navigateur) et le 403 d'un non-admin, repris au lot 3
+**Vérifié le :** 2026-10-17 — `essai.sh peripheriques` (PostgreSQL jetable) : 163 tests OK, dont ceux de `api.tests.test_webcams` (faux lab-media rejouant les réponses I1 du contrat, noms uniques,
 courses simulées) ; migrations 0003/0004 jouées sur PostgreSQL jetable (avant/arrière/avant :
 droits et `since` identiques) ; 0005/0006 sur PostgreSQL jetable : deux « HD USB Camera » →
 « hd usb camera » et « HD USB Camera 2 », doublon refusé par l'index (IntegrityError) ; `makemigrations --check`
-sans écart ; `npm run build` vert. Non vérifié : navigateur réel, lab-media réel (pas encore livré).
+sans écart ; `npm run build` vert. Non vérifié à cette étape : navigateur réel, lab-media réel (pas encore livré) — voir la mise en service ci-dessous.
+**Mis en service le 2026-10-17** (après lab-media) : image construite pendant que l'ancienne tournait, `scripts/app-test.sh peripheriques` vert, migrations 0003 à 0006 jouées, les deux droits gardés sur « Ancienne webcam ». En navigateur réel (`e2e_member`) : les deux HD USB Camera détectées sous « HD USB Camera » et « HD USB Camera 2 », renommage vers un nom pris refusé (400), renommage libre accepté, droit Micro absent et refusé (400) sur une webcam sans micro, droit Vidéo accordé puis lecture autorisée par le hook (WebRTC et HLS), enregistrement activé → segment écrit, puis coupé. Image du direct non vue : le Chromium du runner ne décode pas le H.264.
+(Paragraphe démêlé le 2026-11-08 : les deux textes étaient entrelacés ; seuls ajouts : cette note, « à cette étape » et le renvoi à la mise en service.)
 
 ---
 
@@ -54,7 +57,7 @@ du lab). [C] constaté, [D] déduit.
 - Ce paragraphe est entrelacé : le texte est coupé au milieu.
 - `chantiers/peripheriques/INTEGRATION.md` parle encore de `peripheriques-media` et de la Bbox.
 **Tâches :**
-- [ ] Cocher ou corriger les cases du Lot 1 et démêler son « Vérifié le »
+- [x] Cocher ou corriger les cases du Lot 1 et démêler son « Vérifié le » — fait le 2026-11-08 (travail de nuit)
 - [ ] Archiver ou réécrire `INTEGRATION.md` (fichier d'architecte)
 - [ ] `README.md` : droits par email, rôle de lab-media, page Périphériques, limites (H.264 dans le runner)
 **Tests à passer avant de clore le lot :**
@@ -73,7 +76,7 @@ du lab). [C] constaté, [D] déduit.
 - [ ] Liste ci-dessus cochée et datée
 **Vérifié le :**
 
-## Lot 4 — Gabarit front   ·   statut : en cours
+## Lot 4 — Gabarit front   ·   statut : livré
 **Objectif :** même comportement que le gabarit corrigé (T3). Les polices sont déjà en chemin relatif ; le `redirectUri` est déjà sur la page courante.
 **Tâches :**
 - [x] `tokenBases()` (l'API de l'app seule ; WHEP/HLS posent leur en-tête eux-mêmes, hors intercepteur) ; PKCE ; `redirectUri` par `loginRedirectUri` (chantier failles, I2)
@@ -81,6 +84,7 @@ du lab). [C] constaté, [D] déduit.
 **Tests à passer avant de clore le lot :**
 - [x] Cloisonnement 3/3 ; lien direct conservé — vérifié le 2026-11-01 (lab-runner, `e2e_member`)
 **Vérifié le :** 2026-11-01 — non déployé. `ESSAI_CMD='python manage.py test --settings=config.settings_test' bash chantiers/tests/essai.sh peripheriques` : 163 tests OK ; image `peripheriques-frontend:candidat` construite ; `docker compose config` : `host_ip: 127.0.0.1`. Navigateur : après déploiement.
+Statut passé à « livré » le 2026-11-08 (relecture de nuit) : tâches et test cochés (navigateur 2026-11-01, commit `91db074`), mis en service le 2026-11-01 (section suivante).
 
 ## Mise en service — chantier « failles » (2026-11-01)
 Les mentions « non déployé » ci-dessus datent d'avant cette mise en service. Image construite pendant
@@ -118,6 +122,10 @@ Chantier `chantiers/webcams-modeles` (contrat v1 : I0 coupure, I1 pont, I2 ticke
 - [ ] Après mise en service : couper → le direct d'un membre est expulsé et refusé, les webcams
   enregistrées s'arrêtent ; le direct d'un watcher par google-agenda continue ; rétablir → les
   mêmes webcams se remettent à enregistrer
+**Constat du 2026-11-08 [D] :** les conteneurs `peripheriques-*` ont été recréés le 2026-11-05 à 10 h 35,
+trois minutes après le commit `d6ea9e7` (lot 6) : le code des lots 5 et 6 est vraisemblablement en
+service. `scripts/app-status.sh peripheriques` garde pourtant le déploiement du 2026-11-01 (`2080f19`) :
+cette mise en service n'est pas passée par le chemin qui l'enregistre. Restent les parcours réels.
 **Vérifié le :** 2026-11-05 — non déployé. `essai.sh peripheriques` : 196 tests OK (33 nouveaux),
 `makemigrations --check` sans écart, migration 0007 jouée avant/arrière/avant sur PostgreSQL
 jetable, nouveaux tests rejoués aussi sur PostgreSQL (98 OK) ; cinq mutations des contrôles
@@ -155,6 +163,7 @@ I2 publication WHIP relayée au hook, I3 expulsion d'un publieur, I4 pont + `spe
 - [ ] Après mise en service : un membre avec « Parler » est entendu ; sans droit / pendant la coupure,
   refusé ; un second « Parler » simultané affiche « Quelqu’un parle déjà » ; retirer le droit coupe la
   parole ; un watcher google-agenda parle pendant la coupure si le modèle a le droit
+**Constat du 2026-11-08 [D] :** voir le lot 5 (conteneurs recréés le 2026-11-05 à 10 h 35, après `d6ea9e7`).
 **Vérifié le :** 2026-11-05 — non déployé. `essai.sh peripheriques` : 235 tests OK (39 nouveaux,
 8 assertions de forme existantes étendues des seules nouvelles clés) ; `makemigrations --check`
 sans écart ; 0008 jouée avant/arrière/avant sur PostgreSQL jetable ; sept mutations des contrôles
